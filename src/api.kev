@@ -1,0 +1,53 @@
+⚗ API Integration
+# kevlang-pure v2.1.0
+
+📦 "./config.kev" ⊢ (SEARCH_API, EPISODE_API)
+
+ƒ pick720(ep) → {
+  ∑ cdn ∈ ep.cdnList → {
+    ∑ v ∈ cdn.videoPathList → {
+      ❓ v.quality ≡ 720 → {
+        ⇠ v.videoPath
+      }
+    }
+  }
+  ⇠ ""
+}
+
+ƒ parseBook(item) → {
+  ⇠ 🧬 {
+    bookId: item.bookId,
+    bookName: item.bookName,
+    introduction: item.introduction,
+    cover: item.cover,
+    protagonist: item.protagonist,
+    tagNames: item.tagNames
+  }
+}
+
+ƒ searchDramas(query) → {
+  url ← SEARCH_API ⊕ encodeURIComponent(query) ⊕ "&lang=en"
+  res ← await fetch(url)
+  items ← await res.json()
+  parsed ← []
+  ∑ item ∈ items → {
+    parsed.push(parseBook(item))
+  }
+  ⇠ parsed
+}
+
+ƒ getEpisodes(bookId) → {
+  url ← EPISODE_API ⊕ bookId
+  res ← await fetch(url)
+  episodes ← await res.json()
+  ∑ ep ∈ episodes → {
+    ep.videoUrl ← pick720(ep)
+  }
+  ⇠ episodes
+}
+
+⇠ 🧬 {
+  pick720: pick720,
+  searchDramas: searchDramas,
+  getEpisodes: getEpisodes
+}
