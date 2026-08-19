@@ -1,0 +1,112 @@
+⚗ Bot Handlers
+
+📦 "grammy" ⊢ (Bot, InlineKeyboard)
+📦 "./config.kev" ⊢ (MAX_SEARCH_RESULTS, EPISODES_PER_BATCH, DELETION_TIME_MS)
+📦 "./api.kev" ⊢ (searchDramas, getEpisodes)
+📦 "./helpers.kev" ⊢ (formatBookCaption, formatEpisodeCaption, scheduleDeletion)
+
+# /start command
+ƒ handleStart(ctx) → {
+  🔬 { first_name } ← ctx.from
+  kb ← 🧫 InlineKeyboard()
+  kb.text("💘 Love", "sr:love")
+  kb.row()
+  kb.text("🔥 Revenge", "sr:revenge")
+  kb.row()
+  kb.text("👑 CEO", "sr:ceo")
+  msg ← await ctx.reply("🧪 Welcome to the lab, " ⊕ first_name ⊕ "!\nSend me a drama title to search.", 🧬 { reply_markup: kb })
+  scheduleDeletion(ctx.bot, msg.chat.id, msg.message_id, DELETION_TIME_MS)
+}
+
+# Search handler
+ƒ handleSearch(ctx, query) → {
+  msg ← await ctx.reply("🔍 Searching: " ⊕ query)
+  scheduleDeletion(ctx.bot, msg.chat.id, msg.message_id, DELETION_TIME_MS)
+  
+  🛡 {
+    books ← await searchDramas(query)
+    ❓ books.length ≡ 0 → {
+      m ← await ctx.reply("❌ No results found.")
+      scheduleDeletion(ctx.bot, m.chat.id, m.message_id, DELETION_TIME_MS)
+    } ⚠ → {
+      ∑ book ∈ books.slice(0, MAX_SEARCH_RESULTS) → {
+        caption ← formatBookCaption(book)
+        kb ← 🧫 InlineKeyboard()
+        kb.text("🎞 Get Episodes", "ep:" ⊕ book.bookId ⊕ ":0")
+        m ← await ctx.replyWithPhoto(book.cover, 🧬 { caption: caption, reply_markup: kb })
+        scheduleDeletion(ctx.bot, m.chat.id, m.message_id, DELETION_TIME_MS)
+      }
+    }
+  } ⚠ (err) → {
+    m ← await ctx.reply("⚠️ Search failed: " ⊕ err.message)
+    scheduleDeletion(ctx.bot, m.chat.id, m.message_id, DELETION_TIME_MS)
+  }
+}
+
+# Episodes handler with batching & auto-delete
+ƒ handleEpisodes(ctx, bookId, offset) → {
+  offset ← Number(offset)
+  msg ← await ctx.reply("📡 Fetching episodes...")
+  scheduleDeletion(ctx.bot, msg.chat.id, msg.message_id, DELETION_TIME_MS)
+  
+  🛡 {
+    episodes ← await getEpisodes(bookId)
+    ❓ episodes.length ≡ 0 → {
+      m ← await ctx.reply("❌ No episodes found.")
+      scheduleDeletion(ctx.bot, m.chat.id, m.message_id, DELETION_TIME_MS)
+    } ⚠ → {
+      batch ← episodes.slice(offset, offset ⊕ EPISODES_PER_BATCH)
+      hasNext ← (offset ⊕ EPISODES_PER_BATCH) < episodes.length
+      
+      ∑ ep ∈ batch → {
+        ❓ ep.videoUrl ≡ "" → { ↻ }
+        caption ← formatEpisodeCaption(ep)
+        m ← await ctx.replyWithVideo(ep.videoUrl, 🧬 { caption: caption })
+        scheduleDeletion(ctx.bot, m.chat.id, m.message_id, DELETION_TIME_MS)
+      }
+      
+      ❓ hasNext ≡ true → {
+        kb ← 🧫 InlineKeyboard()
+        kb.text("➡️ Next 20 Episodes", "ep:" ⊕ bookId ⊕ ":" ⊕ (offset ⊕ EPISODES_PER_BATCH))
+        m ← await ctx.reply("📺 More episodes available:", 🧬 { reply_markup: kb })
+        scheduleDeletion(ctx.bot, m.chat.id, m.message_id, DELETION_TIME_MS)
+      } ⚠ → {
+        m ← await ctx.reply("✅ All episodes shown! (Chat will clear)")
+        scheduleDeletion(ctx.bot, m.chat.id, m.message_id, DELETION_TIME_MS)
+      }
+    }
+  } ⚠ (err) → {
+    m ← await ctx.reply("⚠️ Episode fetch failed: " ⊕ err.message)
+    scheduleDeletion(ctx.bot, m.chat.id, m.message_id, DELETION_TIME_MS)
+  }
+}
+
+# Text message handler
+ƒ handleText(ctx) → {
+  query ← ctx.message.text
+  ❓ query.startsWith("/") ≡ false → {
+    handleSearch(ctx, query)
+  }
+}
+
+# Callback query handler
+ƒ handleCallback(ctx) → {
+  data ← ctx.callbackQuery.data
+  ctx.answerCallbackQuery()
+  
+  ❓ data.startsWith("sr:") ≡ true → {
+    query ← data.slice(3)
+    handleSearch(ctx, query)
+  } ⚠ ❓ data.startsWith("ep:") ≡ true → {
+    🔬 [bookId, offset] ← data.slice(3).split(":")
+    handleEpisodes(ctx, bookId, offset)
+  }
+}
+
+⇠ 🧬 {
+  handleStart: handleStart,
+  handleSearch: handleSearch,
+  handleEpisodes: handleEpisodes,
+  handleText: handleText,
+  handleCallback: handleCallback
+}
