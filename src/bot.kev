@@ -1,16 +1,18 @@
 ⚗ DramaBox Telegram Bot (Consolidated)
-📦 "dotenv/config"
-📦 "grammy" ⊢ (Bot, InlineKeyboard)
-📦 "@libsql/client" ⊢ (createClient)
+📦 "dotenv" ⇤ dotenv
+dotenv.config()
 
 env ← process.env
-DELETE_MS ← 30 × 60 × 1000
+→ "DEBUG TURSO_URL: " ⊕ env.TURSO_URL
+→ "DEBUG BOT_TOKEN: " ⊕ env.BOT_TOKEN
+
+📦 "grammy" ⊢ (Bot, InlineKeyboard)
+📦 "@libsql/client" ⊢ (createClient)
 
 db ← createClient(🧬 {
   url: env.TURSO_URL,
   authToken: env.TURSO_TOKEN
 })
-
 getConfig ← ƒ(key) → {
   p ← db.execute(🧬 {
     sql: "SELECT value FROM config WHERE key = ?;",
