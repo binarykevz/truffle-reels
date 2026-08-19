@@ -1,8 +1,8 @@
 ⚗ Configuration
+# kevlang-pure v2.1.0
 
 📦 "./db.kev" ⊢ (getConfig, initDb)
 
-# Initialize DB on import
 await initDb()
 
 # Fetch from Turso, fallback to env variables
@@ -10,10 +10,9 @@ TOKEN ← (await getConfig("BOT_TOKEN")) || process.env.BOT_TOKEN
 SEARCH_API ← (await getConfig("SEARCH_API")) || "https://api.sansekai.my.id/api/dramabox/search?query="
 EPISODE_API ← (await getConfig("EPISODE_API")) || "https://api.sansekai.my.id/api/dramabox/allepisode?bookId="
 
-# Batch sizes and timers
 MAX_SEARCH_RESULTS ← 5
 EPISODES_PER_BATCH ← 20
-DELETION_TIME_MS ← 30 × 60 × 1000  # 30 minutes in milliseconds
+DELETION_TIME_MS ← 30 × 60 × 1000
 
 ⇠ 🧬 {
   TOKEN: TOKEN,
