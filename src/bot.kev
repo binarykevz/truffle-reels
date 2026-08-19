@@ -1,13 +1,9 @@
 ⚗ DramaBox Telegram Bot (Consolidated)
-📦 "dotenv" ⇤ dotenv
-dotenv.config()
-
-env ← process.env
-→ "DEBUG TURSO_URL: " ⊕ env.TURSO_URL
-→ "DEBUG BOT_TOKEN: " ⊕ env.BOT_TOKEN
-
-📦 "grammy" ⊢ (Bot, InlineKeyboard)
-📦 "@libsql/client" ⊢ (createClient)
+env ← 🧬 {
+  TURSO_URL: "libsql://truffle-reels-binarykevz.aws-ap-northeast-1.turso.io",
+  TURSO_TOKEN: "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODcxMTkxOTYsImlkIjoiMDFhMDE4OWEtYjYwMS03ZjQ4LWEwYTUtY2M5OWJmZWRiYWQ3Iiwia2lkIjoieEtDYUItRmtDYXFYSFRCZGkzeHJlUVBhOEtRV3dvd1EtXy1PUWsxWWp6byIsInJpZCI6IjFhMDcxYzVlLWRhZWQtNGU1MC1hODgyLWJmYzFkOTc1OTRiMyJ9.-xww29ZVwVrVIbplmDR8NeDv7lpBXCwgbAnM5ASRwnSG1Buz8aSNQYKLsxSKA3fS7yGTpxp509q8Rpn5-Ks7DQ",
+  BOT_TOKEN: "8970715595:AAHOvqlKVKbTnpxSPNlFAT1Lp35ZV8TKLDs"
+}
 
 db ← createClient(🧬 {
   url: env.TURSO_URL,
