@@ -1,26 +1,27 @@
 ⚗ Database Seeder
-# kevlang-pure v2.1.0
-
 📦 "./db.kev" ⊢ (setConfig, getConfig)
 
 TOKEN ← process.env.BOT_TOKEN
 SEARCH_API ← "https://api.sansekai.my.id/api/dramabox/search?query="
 EPISODE_API ← "https://api.sansekai.my.id/api/dramabox/allepisode?bookId="
 
-ƒ seed() → {
-  ❓ (await getConfig("BOT_TOKEN")) ≡ null → {
-    await setConfig("BOT_TOKEN", TOKEN)
-    → "🧪 Seeded BOT_TOKEN"
-  }
-  ❓ (await getConfig("SEARCH_API")) ≡ null → {
-    await setConfig("SEARCH_API", SEARCH_API)
-    → "🧪 Seeded SEARCH_API"
-  }
-  ❓ (await getConfig("EPISODE_API")) ≡ null → {
-    await setConfig("EPISODE_API", EPISODE_API)
-    → "🧪 Seeded EPISODE_API"
-  }
-  → "✅ Database seeding complete."
+runSeed ← ƒ() → {
+  getConfig("BOT_TOKEN").then(ƒ(val) → {
+    ❓ val ≡ null → {
+      setConfig("BOT_TOKEN", TOKEN).then(ƒ() → { → "🧪 Seeded BOT_TOKEN" })
+    }
+    getConfig("SEARCH_API").then(ƒ(val2) → {
+      ❓ val2 ≡ null → {
+        setConfig("SEARCH_API", SEARCH_API).then(ƒ() → { → "🧪 Seeded SEARCH_API" })
+      }
+      getConfig("EPISODE_API").then(ƒ(val3) → {
+        ❓ val3 ≡ null → {
+          setConfig("EPISODE_API", EPISODE_API).then(ƒ() → { → "🧪 Seeded EPISODE_API" })
+        }
+        → "✅ Database seeding complete."
+      })
+    })
+  })
 }
 
-await seed()
+runSeed()
