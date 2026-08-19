@@ -1,19 +1,14 @@
-⚗ Database Seeder
+⚗ DramaBox Telegram Bot (Consolidated)
+📦 "grammy" ⊢ (Bot, InlineKeyboard)
 📦 "@libsql/client" ⊢ (createClient)
 
 env ← process.env
+DELETE_MS ← 30 × 60 × 1000
 
 db ← createClient(🧬 {
   url: env.TURSO_URL,
   authToken: env.TURSO_TOKEN
 })
-
-setConfig ← ƒ(key, value) → {
-  ⇠ db.execute(🧬 {
-    sql: "INSERT OR REPLACE INTO config (key, value) VALUES (?, ?);",
-    args: [key, value]
-  })
-}
 
 getConfig ← ƒ(key) → {
   p ← db.execute(🧬 {
@@ -30,22 +25,192 @@ getConfig ← ƒ(key) → {
   })
 }
 
-seedOne ← ƒ(key, value, label) → {
-  g ← getConfig(key)
-  g.then(ƒ(val) → {
-    ❓ val ≡ null → {
-      s ← setConfig(key, value)
-      s.then(ƒ() → {
-        → "🧪 Seeded " ⊕ label
-      })
+pick720 ← ƒ(ep) → {
+  cdnList ← ep.cdnList
+  ∑ cdn ∈ cdnList → {
+    vpl ← cdn.videoPathList
+    ∑ v ∈ vpl → {
+      ❓ v.quality ≡ 720 → {
+        ⇠ v.videoPath
+      }
     }
-  })
+  }
+  ⇠ ""
 }
 
-ip ← db.execute("CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT NOT NULL);")
-ip.then(ƒ() → {
-  seedOne("BOT_TOKEN", env.BOT_TOKEN, "BOT_TOKEN")
-  seedOne("SEARCH_API", "https://api.sansekai.my.id/api/dramabox/search?query=", "SEARCH_API")
-  seedOne("EPISODE_API", "https://api.sansekai.my.id/api/dramabox/allepisode?bookId=", "EPISODE_API")
-  → "✅ Seeding triggered."
+scheduleDeletion ← ƒ(botRef, chatId, messageId, delay) → {
+  setTimeout(ƒ() → {
+    api ← botRef.api
+    dp ← api.deleteMessage(chatId, messageId)
+    dp.catch(ƒ(err) → {
+      → "⚠️ Failed to auto-delete: " ⊕ err.message
+    })
+  }, delay)
+}
+
+sendSearchResults ← ƒ(ctx, items, botRef) → {
+  top ← items.slice(0, 5)
+  ∑ item ∈ top → {
+    bn ← item.bookName
+    intro ← item.introduction
+    prot ← item.protagonist
+    tn ← item.tagNames
+    tagStr ← tn.join(", ")
+    caption ← "🎬 " ⊕ bn ⊕ "\n\n📖 " ⊕ intro ⊕ "\n\n🧑‍🤝‍🧑 " ⊕ prot ⊕ "\n🏷 " ⊕ tagStr
+    kb ← 🧫 InlineKeyboard()
+    bid ← item.bookId
+    kb.text("🎞 Get Episodes", "ep:" ⊕ bid ⊕ ":0")
+    cov ← item.cover
+    pr ← ctx.replyWithPhoto(cov, 🧬 { caption: caption, reply_markup: kb })
+    pr.then(ƒ(m) → {
+      chat ← m.chat
+      scheduleDeletion(botRef, chat.id, m.message_id, DELETE_MS)
+    })
+  }
+}
+
+# ── Boot sequence ──
+initP ← db.execute("CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT NOT NULL);")
+initP.then(ƒ() → {
+  → "🗄️ Database initialized."
+  t1 ← getConfig("BOT_TOKEN")
+  t1.then(ƒ(dbToken) → {
+    TOKEN ← dbToken
+    ❓ dbToken ≡ null → {
+      TOKEN ↞ env.BOT_TOKEN
+    }
+    t2 ← getConfig("SEARCH_API")
+    t2.then(ƒ(dbSearch) → {
+      SEARCH_API ← dbSearch
+      ❓ dbSearch ≡ null → {
+        SEARCH_API ↞ "https://api.sansekai.my.id/api/dramabox/search?query="
+      }
+      t3 ← getConfig("EPISODE_API")
+      t3.then(ƒ(dbEp) → {
+        EPISODE_API ← dbEp
+        ❓ dbEp ≡ null → {
+          EPISODE_API ↞ "https://api.sansekai.my.id/api/dramabox/allepisode?bookId="
+        }
+
+        bot ← 🧫 Bot(TOKEN)
+
+        bot.command("start", ƒ(ctx) → {
+          from ← ctx.from
+          🔬 { first_name } ← from
+          kb ← 🧫 InlineKeyboard()
+          kb.text("💘 Love", "sr:love")
+          kb.row()
+          kb.text("🔥 Revenge", "sr:revenge")
+          kb.row()
+          kb.text("👑 CEO", "sr:ceo")
+          rp ← ctx.reply("🧪 Welcome to the lab, " ⊕ first_name ⊕ "!\nSend me a drama title.", 🧬 { reply_markup: kb })
+          rp.then(ƒ(m) → {
+            chat ← m.chat
+            scheduleDeletion(bot, chat.id, m.message_id, DELETE_MS)
+          })
+        })
+
+        bot.on("message:text", ƒ(ctx) → {
+          msg ← ctx.message
+          query ← msg.text
+          isCmd ← query.startsWith("/")
+          ❓ isCmd ≡ false → {
+            rp ← ctx.reply("🔍 Searching...")
+            rp.then(ƒ(m) → {
+              chat ← m.chat
+              scheduleDeletion(bot, chat.id, m.message_id, DELETE_MS)
+            })
+            encoded ← encodeURIComponent(query)
+            url ← SEARCH_API ⊕ encoded ⊕ "&lang=en"
+            fp ← fetch(url)
+            fp.then(ƒ(res) → {
+              jp ← res.json()
+              jp.then(ƒ(items) → {
+                len ← items.length
+                ❓ len ≡ 0 → {
+                  nr ← ctx.reply("❌ No results.")
+                  nr.then(ƒ(m2) → {
+                    c2 ← m2.chat
+                    scheduleDeletion(bot, c2.id, m2.message_id, DELETE_MS)
+                  })
+                } ⚠ → {
+                  sendSearchResults(ctx, items, bot)
+                }
+              })
+            })
+          }
+        })
+
+        bot.on("callback_query:data", ƒ(ctx) → {
+          cq ← ctx.callbackQuery
+          data ← cq.data
+          ctx.answerCallbackQuery()
+          isSr ← data.startsWith("sr:")
+          isEp ← data.startsWith("ep:")
+          ❓ isSr ≡ true → {
+            sliced ← data.slice(3)
+            encoded ← encodeURIComponent(sliced)
+            url ← SEARCH_API ⊕ encoded ⊕ "&lang=en"
+            fp ← fetch(url)
+            fp.then(ƒ(res) → {
+              jp ← res.json()
+              jp.then(ƒ(items) → {
+                sendSearchResults(ctx, items, bot)
+              })
+            })
+          } ⚠ ❓ isEp ≡ true → {
+            sliced ← data.slice(3)
+            parts ← sliced.split(":")
+            bookId ← parts[0]
+            offsetStr ← parts[1]
+            offset ← Number(offsetStr)
+            rp ← ctx.reply("📡 Fetching episodes...")
+            rp.then(ƒ(m) → {
+              chat ← m.chat
+              scheduleDeletion(bot, chat.id, m.message_id, DELETE_MS)
+            })
+            epUrl ← EPISODE_API ⊕ bookId
+            fp ← fetch(epUrl)
+            fp.then(ƒ(res) → {
+              jp ← res.json()
+              jp.then(ƒ(episodes) → {
+                batch ← episodes.slice(offset, offset ⊕ 20)
+                totalLen ← episodes.length
+                hasNext ← (offset ⊕ 20) < totalLen
+                ∑ ep ∈ batch → {
+                  video ← pick720(ep)
+                  ❓ video ≡ "" → {
+                    ↻
+                  }
+                  cap ← "🎬 " ⊕ ep.chapterName ⊕ " (720p) ⏳ Auto-deletes in 30m"
+                  vr ← ctx.replyWithVideo(video, 🧬 { caption: cap })
+                  vr.then(ƒ(m4) → {
+                    c4 ← m4.chat
+                    scheduleDeletion(bot, c4.id, m4.message_id, DELETE_MS)
+                  })
+                }
+                ❓ hasNext ≡ true → {
+                  kb ← 🧫 InlineKeyboard()
+                  nextOffset ← offset ⊕ 20
+                  kb.text("➡️ Next 20 Episodes", "ep:" ⊕ bookId ⊕ ":" ⊕ nextOffset)
+                  mr ← ctx.reply("📺 More episodes available:", 🧬 { reply_markup: kb })
+                  mr.then(ƒ(m5) → {
+                    c5 ← m5.chat
+                    scheduleDeletion(bot, c5.id, m5.message_id, DELETE_MS)
+                  })
+                }
+              })
+            })
+          }
+        })
+
+        bot.catch(ƒ(err) → {
+          → "🧪 Bot error: " ⊕ err.message
+        })
+
+        → "🧪 Bot is running on kevlang-pure v2.1.0..."
+        bot.start()
+      })
+    })
+  })
 })
