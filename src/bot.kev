@@ -77,6 +77,7 @@ scheduleDeletion ← ƒ(botRef, chatId, messageId, delay) → {
 sendSearchResults ← ƒ(ctx, items, botRef) → {
   top ← items.slice(0, 5)
   ∑ item ∈ top → {
+    → "DEBUG SEARCH ITEM BOOKID: " ⊕ item.bookId
     bn ← item.bookName
     intro ← item.introduction
     prot ← item.protagonist
@@ -200,7 +201,12 @@ initP.then(ƒ() → {
             offsetStr ← parts[1]
             offset ← Number(offsetStr)
             
-            epUrl ← EPISODE_API ⊕ bookId
+            → "DEBUG CALLBACK BOOKID: " ⊕ bookId
+            
+            # 🧪 ADDED &lang=en PARAMETER
+            epUrl ← EPISODE_API ⊕ bookId ⊕ "&lang=en"
+            → "DEBUG EP URL: " ⊕ epUrl
+            
             rp ← ctx.reply("📡 Fetching episodes...")
             rp.then(ƒ(m) → {
               chat ← m.chat
@@ -215,10 +221,19 @@ initP.then(ƒ() → {
             })
             
             p2 ← p1.then(ƒ(episodes) → {
+              # 🧪 PRINT RAW API RESPONSE
+              → "DEBUG RAW EPISODES: " ⊕ JSON.stringify(episodes)
+              
               ❓ episodes == null → {
                 ctx.reply("❌ API returned no episodes.")
                 ⇠
               }
+              
+              # If the API returns an object with a data property, use that
+              ❓ episodes.data != null → {
+                episodes ↞ episodes.data
+              }
+              
               len ← episodes.length
               → "DEBUG EPISODES COUNT: " ⊕ len
               batch ← episodes.slice(offset, offset ⊕ 20)
