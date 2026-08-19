@@ -1,21 +1,19 @@
 ⚗ Utility Helpers
+# kevlang-pure v2.1.0
 
-# Format book caption
 ƒ formatBookCaption(book) → {
   tags ← book.tagNames.join(", ")
   caption ← "🎬 " ⊕ book.bookName
   caption ↞ caption ⊕ "\n\n📖 " ⊕ book.introduction
-  caption ↞ caption ⊕ "\n\n🧑‍🤝‍ " ⊕ book.protagonist
-  caption ↞ caption ⊕ "\n " ⊕ tags
+  caption ↞ caption ⊕ "\n\n🧑‍🤝‍🧑 " ⊕ book.protagonist
+  caption ↞ caption ⊕ "\n🏷 " ⊕ tags
   ⇠ caption
 }
 
-# Format episode caption
 ƒ formatEpisodeCaption(ep) → {
   ⇠ "🎬 " ⊕ ep.chapterName ⊕ " (720p) ⏳ Auto-deletes in 30m"
 }
 
-# Schedule message deletion
 ƒ scheduleDeletion(bot, chatId, messageId, delay) → {
   setTimeout(ƒ() → {
     bot.api.deleteMessage(chatId, messageId).catch(ƒ(err) → {
