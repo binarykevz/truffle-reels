@@ -1,27 +1,12 @@
-⚗ DramaBox Telegram Bot — Main Entry
-# kevlang-pure v2.1.0
-
+⚗ DramaBox Telegram Bot
 📦 "grammy" ⊢ (Bot)
-📦 "./config.kev" ⊢ (TOKEN)
-📦 "./handlers.kev" ⊢ (handleStart, handleText, handleCallback)
+📦 "./config.kev" ⊢ (startSequence)
+📦 "./handlers.kev" ⊢ (setupHandlers)
 
-bot ← 🧫 Bot(TOKEN)
-
-bot.command("start", ƒ(ctx) → {
-  handleStart(ctx)
+startSequence(ƒ(config) → {
+  bot ← 🧫 Bot(config.TOKEN)
+  setupHandlers(bot, config)
+  bot.catch(ƒ(err) → { → "🧪 Bot error: " ⊕ err.message })
+  → "🧪 Bot is running on kevlang-pure v2.1.0..."
+  bot.start()
 })
-
-bot.on("message:text", ƒ(ctx) → {
-  handleText(ctx)
-})
-
-bot.on("callback_query:data", ƒ(ctx) → {
-  handleCallback(ctx)
-})
-
-bot.catch(ƒ(err) → {
-  → "🧪 Bot error: " ⊕ err.message
-})
-
-→ "🧪 Bot is running on kevlang-pure v2.1.0..."
-bot.start()
