@@ -1,14 +1,12 @@
 {
-  "name": "dramabox-bot",
+  "name": "truffle-reels-bot",
   "version": "1.2.0",
-  "description": "Telegram bot for DramaBox video search — KevLang-Pure v2.1.0, Bun, Turso, auto-deleting episodes",
   "type": "module",
   "scripts": {
-    "build": "kev build src/db.kev && kev build src/seed.kev && kev build src/config.kev && kev build src/api.kev && kev build src/helpers.kev && kev build src/handlers.kev && kev build src/bot.kev",
-    "start": "bun run dist/bot.ts",
-    "dev": "kev run src/bot.kev",
-    "seed": "kev run src/seed.kev",
-    "check": "kev check src/bot.kev"
+    "build": "kevpure build src/db.kev && kevpure build src/seed.kev && kevpure build src/config.kev && kevpure build src/api.kev && kevpure build src/helpers.kev && kevpure build src/handlers.kev && kevpure build src/bot.kev",
+    "start": "bun run src/bot.ts",
+    "dev": "kevpure run src/bot.kev",
+    "seed": "kevpure run src/seed.kev"
   },
   "dependencies": {
     "grammy": "^1.21.1",
@@ -20,7 +18,5 @@
   },
   "engines": {
     "bun": ">=1.0.0"
-  },
-  "keywords": ["telegram", "bot", "dramabox", "kevlang-pure", "bun", "turso"],
-  "license": "MIT"
+  }
 }
