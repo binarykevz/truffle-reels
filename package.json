@@ -1,9 +1,9 @@
 {
-  "name": "truffle-reels-bot",
-  "version": "1.2.0",
+  "name": "dramabox-bot",
+  "version": "1.2.1",
   "type": "module",
   "scripts": {
-    "build": "kevpure build src/db.kev && kevpure build src/seed.kev && kevpure build src/config.kev && kevpure build src/api.kev && kevpure build src/helpers.kev && kevpure build src/handlers.kev && kevpure build src/bot.kev",
+    "build": "kevpure build src/seed.kev && kevpure build src/bot.kev",
     "start": "bun run src/bot.ts",
     "dev": "kevpure run src/bot.kev",
     "seed": "kevpure run src/seed.kev"
