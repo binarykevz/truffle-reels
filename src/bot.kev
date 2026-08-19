@@ -10,7 +10,9 @@ env ← 🧬 {
   TURSO_TOKEN: "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODcxMTkxOTYsImlkIjoiMDFhMDE4OWEtYjYwMS03ZjQ4LWEwYTUtY2M5OWJmZWRiYWQ3Iiwia2lkIjoieEtDYUItRmtDYXFYSFRCZGkzeHJlUVBhOEtRV3dvd1EtXy1PUWsxWWp6byIsInJpZCI6IjFhMDcxYzVlLWRhZWQtNGU1MC1hODgyLWJmYzFkOTc1OTRiMyJ9.-xww29ZVwVrVIbplmDR8NeDv7lpBXCwgbAnM5ASRwnSG1Buz8aSNQYKLsxSKA3fS7yGTpxp509q8Rpn5-Ks7DQ",
   BOT_TOKEN: "8970715595:AAHOvqlKVKbTnpxSPNlFAT1Lp35ZV8TKLDs"
 }
+
 DELETE_MS ← 30 × 60 × 1000
+
 db ← createClient(🧬 {
   url: env.TURSO_URL,
   authToken: env.TURSO_TOKEN
@@ -170,21 +172,30 @@ initP.then(ƒ() → {
             bookId ← parts[0]
             offsetStr ← parts[1]
             offset ← Number(offsetStr)
+            
+            → "DEBUG EPISODE_API INSIDE CB: " ⊕ EPISODE_API
+            epUrl ← EPISODE_API ⊕ bookId
+            → "DEBUG FETCH URL: " ⊕ epUrl
+            
             rp ← ctx.reply("📡 Fetching episodes...")
             rp.then(ƒ(m) → {
               chat ← m.chat
               scheduleDeletion(bot, chat.id, m.message_id, DELETE_MS)
             })
-            epUrl ← EPISODE_API ⊕ bookId
+            
             fp ← fetch(epUrl)
             fp.then(ƒ(res) → {
+              → "DEBUG FETCH STATUS: " ⊕ res.status
               jp ← res.json()
               jp.then(ƒ(episodes) → {
+                → "DEBUG EPISODES COUNT: " ⊕ episodes.length
                 batch ← episodes.slice(offset, offset ⊕ 20)
                 totalLen ← episodes.length
                 hasNext ← (offset ⊕ 20) < totalLen
+                
                 ∑ ep ∈ batch → {
                   video ← pick720(ep)
+                  → "DEBUG PICKED VIDEO: " ⊕ video
                   ❓ video == "" → {
                     ↻
                   }
@@ -193,8 +204,11 @@ initP.then(ƒ() → {
                   vr.then(ƒ(m4) → {
                     c4 ← m4.chat
                     scheduleDeletion(bot, c4.id, m4.message_id, DELETE_MS)
+                  }).catch(ƒ(err) → {
+                    → "DEBUG SEND VIDEO ERROR: " ⊕ err.message
                   })
                 }
+                
                 ❓ hasNext == true → {
                   kb ← 🧫 InlineKeyboard()
                   nextOffset ← offset ⊕ 20
@@ -205,7 +219,11 @@ initP.then(ƒ() → {
                     scheduleDeletion(bot, c5.id, m5.message_id, DELETE_MS)
                   })
                 }
+              }).catch(ƒ(err) → {
+                → "DEBUG JSON ERROR: " ⊕ err.message
               })
+            }).catch(ƒ(err) → {
+              → "DEBUG FETCH ERROR: " ⊕ err.message
             })
           }
         })
