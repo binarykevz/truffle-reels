@@ -1,4 +1,5 @@
 ⚗ Database Seeder
+📦 "dotenv/config"
 📦 "@libsql/client" ⊢ (createClient)
 
 env ← process.env
