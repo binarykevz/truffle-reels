@@ -33,10 +33,11 @@ getConfig ← ƒ(key) → {
   })
 }
 
-# 🧪 BULLETPROOF PARSER
+# 🧪 IMPROVED PARSER WITH FALLBACK
 getEpisodeData ← ƒ(ep) → {
   cName ← ep.chapterName
   video ← ""
+  fallbackVideo ← ""
   cdnList ← ep.cdnList
   
   ❓ cdnList == null → {
@@ -49,13 +50,24 @@ getEpisodeData ← ƒ(ep) → {
       ↻
     }
     ∑ v ∈ vpl → {
-      q ← v.quality
+      # Save the first available video as a fallback
+      ❓ fallbackVideo == "" → {
+        fallbackVideo ↞ v.videoPath
+      }
+      
+      # Convert quality to number to handle both "720" and 720
+      q ← Number(v.quality)
       ❓ q == 720 → {
         ❓ video == "" → {
           video ↞ v.videoPath
         }
       }
     }
+  }
+  
+  # If no 720p video was found, use the first available video
+  ❓ video == "" → {
+    video ↞ fallbackVideo
   }
   
   ⇠ 🧬 {
@@ -77,7 +89,6 @@ scheduleDeletion ← ƒ(botRef, chatId, messageId, delay) → {
 sendSearchResults ← ƒ(ctx, items, botRef) → {
   top ← items.slice(0, 5)
   ∑ item ∈ top → {
-    → "DEBUG SEARCH ITEM BOOKID: " ⊕ item.bookId
     bn ← item.bookName
     intro ← item.introduction
     prot ← item.protagonist
@@ -201,41 +212,37 @@ initP.then(ƒ() → {
             offsetStr ← parts[1]
             offset ← Number(offsetStr)
             
-            → "DEBUG CALLBACK BOOKID: " ⊕ bookId
-            
-            # 🧪 ADDED &lang=en PARAMETER
             epUrl ← EPISODE_API ⊕ bookId ⊕ "&lang=en"
-            → "DEBUG EP URL: " ⊕ epUrl
-            
             rp ← ctx.reply("📡 Fetching episodes...")
             rp.then(ƒ(m) → {
               chat ← m.chat
               scheduleDeletion(bot, chat.id, m.message_id, DELETE_MS)
             })
             
-            # 🧪 FLAT PROMISE CHAIN FOR EPISODES
             fp ← fetch(epUrl)
             p1 ← fp.then(ƒ(res) → {
-              → "DEBUG FETCH STATUS: " ⊕ res.status
               ⇠ res.json()
             })
             
             p2 ← p1.then(ƒ(episodes) → {
-              # 🧪 PRINT RAW API RESPONSE
-              → "DEBUG RAW EPISODES: " ⊕ JSON.stringify(episodes)
-              
               ❓ episodes == null → {
                 ctx.reply("❌ API returned no episodes.")
                 ⇠
               }
               
-              # If the API returns an object with a data property, use that
+              # Handle case where API wraps data in an object
               ❓ episodes.data != null → {
                 episodes ↞ episodes.data
               }
               
               len ← episodes.length
               → "DEBUG EPISODES COUNT: " ⊕ len
+              
+              ❓ len == 0 → {
+                ctx.reply("❌ No episodes found for this book.")
+                ⇠
+              }
+              
               batch ← episodes.slice(offset, offset ⊕ 20)
               totalLen ← episodes.length
               hasNext ← (offset ⊕ 20) < totalLen
