@@ -33,17 +33,39 @@ getConfig ← ƒ(key) → {
   })
 }
 
-pick720 ← ƒ(ep) → {
+# 🧪 NEW BULLETPROOF PARSER
+getEpisodeData ← ƒ(ep) → {
+  cName ← ep.chapterName
+  video ← ""
   cdnList ← ep.cdnList
+  
+  # Safety check in case an episode has no CDNs
+  ❓ cdnList == null → {
+    ⇠ 🧬 { chapterName: cName, videoUrl: video }
+  }
+  
   ∑ cdn ∈ cdnList → {
     vpl ← cdn.videoPathList
+    ❓ vpl == null → {
+      ↻
+    }
     ∑ v ∈ vpl → {
-      ❓ v.quality == 720 → {
-        ⇠ v.videoPath
+      q ← v.quality
+      # Explicitly check for 720p quality
+      ❓ q == 720 → {
+        # Only assign if we haven't found a 720p video yet
+        ❓ video == "" → {
+          video ↞ v.videoPath
+        }
       }
     }
   }
-  ⇠ ""
+  
+  # Return both the chapter name and the extracted 720p URL
+  ⇠ 🧬 {
+    chapterName: cName,
+    videoUrl: video
+  }
 }
 
 scheduleDeletion ← ƒ(botRef, chatId, messageId, delay) → {
@@ -173,10 +195,7 @@ initP.then(ƒ() → {
             offsetStr ← parts[1]
             offset ← Number(offsetStr)
             
-            → "DEBUG EPISODE_API INSIDE CB: " ⊕ EPISODE_API
             epUrl ← EPISODE_API ⊕ bookId
-            → "DEBUG FETCH URL: " ⊕ epUrl
-            
             rp ← ctx.reply("📡 Fetching episodes...")
             rp.then(ƒ(m) → {
               chat ← m.chat
@@ -185,22 +204,28 @@ initP.then(ƒ() → {
             
             fp ← fetch(epUrl)
             fpThen ← fp.then(ƒ(res) → {
-              → "DEBUG FETCH STATUS: " ⊕ res.status
               jp ← res.json()
               jpThen ← jp.then(ƒ(episodes) → {
-                → "DEBUG EPISODES COUNT: " ⊕ episodes.length
                 batch ← episodes.slice(offset, offset ⊕ 20)
                 totalLen ← episodes.length
                 hasNext ← (offset ⊕ 20) < totalLen
                 
+                # 🧪 EPISODE PARSING & SENDING LOOP
                 ∑ ep ∈ batch → {
-                  video ← pick720(ep)
-                  → "DEBUG PICKED VIDEO: " ⊕ video
+                  parsedEp ← getEpisodeData(ep)
+                  video ← parsedEp.videoUrl
+                  cName ← parsedEp.chapterName
+                  
+                  → "DEBUG EPISODE: " ⊕ cName ⊕ " | URL: " ⊕ video
+                  
+                  # Skip if no 720p video was found
                   ❓ video == "" → {
                     ↻
                   }
-                  cap ← "🎬 " ⊕ ep.chapterName ⊕ " (720p) ⏳ Auto-deletes in 30m"
+                  
+                  cap ← "🎬 " ⊕ cName ⊕ " (720p) ⏳ Auto-deletes in 30m"
                   vr ← ctx.replyWithVideo(video, 🧬 { caption: cap })
+                  
                   vrThen ← vr.then(ƒ(m4) → {
                     c4 ← m4.chat
                     scheduleDeletion(bot, c4.id, m4.message_id, DELETE_MS)
@@ -215,9 +240,12 @@ initP.then(ƒ() → {
                   nextOffset ← offset ⊕ 20
                   kb.text("➡️ Next 20 Episodes", "ep:" ⊕ bookId ⊕ ":" ⊕ nextOffset)
                   mr ← ctx.reply("📺 More episodes available:", 🧬 { reply_markup: kb })
-                  mr.then(ƒ(m5) → {
+                  mrThen ← mr.then(ƒ(m5) → {
                     c5 ← m5.chat
                     scheduleDeletion(bot, c5.id, m5.message_id, DELETE_MS)
+                  })
+                  mrThen.catch(ƒ(err) → {
+                    → err.message
                   })
                 }
               })
