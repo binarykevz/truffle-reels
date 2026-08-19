@@ -215,7 +215,6 @@ initP.then(ƒ() → {
             })
             
             p2 ← p1.then(ƒ(episodes) → {
-              → "DEBUG EPISODES TYPE: " ⊕ typeof episodes
               ❓ episodes == null → {
                 ctx.reply("❌ API returned no episodes.")
                 ⇠
