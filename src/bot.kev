@@ -30,7 +30,7 @@ pick720 ← ƒ(ep) → {
   ∑ cdn ∈ cdnList → {
     vpl ← cdn.videoPathList
     ∑ v ∈ vpl → {
-      ❓ v.quality ≡ 720 → {
+      ❓ v.quality == 720 → {
         ⇠ v.videoPath
       }
     }
@@ -76,19 +76,19 @@ initP.then(ƒ() → {
   t1 ← getConfig("BOT_TOKEN")
   t1.then(ƒ(dbToken) → {
     TOKEN ← dbToken
-    ❓ dbToken ≡ null → {
+    ❓ dbToken == null → {
       TOKEN ↞ env.BOT_TOKEN
     }
     t2 ← getConfig("SEARCH_API")
     t2.then(ƒ(dbSearch) → {
       SEARCH_API ← dbSearch
-      ❓ dbSearch ≡ null → {
+      ❓ dbSearch == null → {
         SEARCH_API ↞ "https://api.sansekai.my.id/api/dramabox/search?query="
       }
       t3 ← getConfig("EPISODE_API")
       t3.then(ƒ(dbEp) → {
         EPISODE_API ← dbEp
-        ❓ dbEp ≡ null → {
+        ❓ dbEp == null → {
           EPISODE_API ↞ "https://api.sansekai.my.id/api/dramabox/allepisode?bookId="
         }
 
@@ -114,7 +114,7 @@ initP.then(ƒ() → {
           msg ← ctx.message
           query ← msg.text
           isCmd ← query.startsWith("/")
-          ❓ isCmd ≡ false → {
+          ❓ isCmd == false → {
             rp ← ctx.reply("🔍 Searching...")
             rp.then(ƒ(m) → {
               chat ← m.chat
@@ -127,7 +127,7 @@ initP.then(ƒ() → {
               jp ← res.json()
               jp.then(ƒ(items) → {
                 len ← items.length
-                ❓ len ≡ 0 → {
+                ❓ len == 0 → {
                   nr ← ctx.reply("❌ No results.")
                   nr.then(ƒ(m2) → {
                     c2 ← m2.chat
@@ -147,7 +147,7 @@ initP.then(ƒ() → {
           ctx.answerCallbackQuery()
           isSr ← data.startsWith("sr:")
           isEp ← data.startsWith("ep:")
-          ❓ isSr ≡ true → {
+          ❓ isSr == true → {
             sliced ← data.slice(3)
             encoded ← encodeURIComponent(sliced)
             url ← SEARCH_API ⊕ encoded ⊕ "&lang=en"
@@ -158,7 +158,7 @@ initP.then(ƒ() → {
                 sendSearchResults(ctx, items, bot)
               })
             })
-          } ⚠ ❓ isEp ≡ true → {
+          } ⚠ ❓ isEp == true → {
             sliced ← data.slice(3)
             parts ← sliced.split(":")
             bookId ← parts[0]
@@ -179,7 +179,7 @@ initP.then(ƒ() → {
                 hasNext ← (offset ⊕ 20) < totalLen
                 ∑ ep ∈ batch → {
                   video ← pick720(ep)
-                  ❓ video ≡ "" → {
+                  ❓ video == "" → {
                     ↻
                   }
                   cap ← "🎬 " ⊕ ep.chapterName ⊕ " (720p) ⏳ Auto-deletes in 30m"
@@ -189,7 +189,7 @@ initP.then(ƒ() → {
                     scheduleDeletion(bot, c4.id, m4.message_id, DELETE_MS)
                   })
                 }
-                ❓ hasNext ≡ true → {
+                ❓ hasNext == true → {
                   kb ← 🧫 InlineKeyboard()
                   nextOffset ← offset ⊕ 20
                   kb.text("➡️ Next 20 Episodes", "ep:" ⊕ bookId ⊕ ":" ⊕ nextOffset)
