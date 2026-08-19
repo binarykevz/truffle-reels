@@ -1,0 +1,25 @@
+⚗ Configuration
+
+📦 "./db.kev" ⊢ (getConfig, initDb)
+
+# Initialize DB on import
+await initDb()
+
+# Fetch from Turso, fallback to env variables
+TOKEN ← (await getConfig("BOT_TOKEN")) || process.env.BOT_TOKEN
+SEARCH_API ← (await getConfig("SEARCH_API")) || "https://api.sansekai.my.id/api/dramabox/search?query="
+EPISODE_API ← (await getConfig("EPISODE_API")) || "https://api.sansekai.my.id/api/dramabox/allepisode?bookId="
+
+# Batch sizes and timers
+MAX_SEARCH_RESULTS ← 5
+EPISODES_PER_BATCH ← 20
+DELETION_TIME_MS ← 30 × 60 × 1000  # 30 minutes in milliseconds
+
+⇠ 🧬 {
+  TOKEN: TOKEN,
+  SEARCH_API: SEARCH_API,
+  EPISODE_API: EPISODE_API,
+  MAX_SEARCH_RESULTS: MAX_SEARCH_RESULTS,
+  EPISODES_PER_BATCH: EPISODES_PER_BATCH,
+  DELETION_TIME_MS: DELETION_TIME_MS
+}
