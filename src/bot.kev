@@ -1,4 +1,5 @@
 ⚗ DramaBox Telegram Bot (Consolidated)
+📦 "dotenv/config"
 📦 "grammy" ⊢ (Bot, InlineKeyboard)
 📦 "@libsql/client" ⊢ (createClient)
 
