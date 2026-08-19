@@ -1,0 +1,31 @@
+⚗ Utility Helpers
+
+# Format book caption
+ƒ formatBookCaption(book) → {
+  tags ← book.tagNames.join(", ")
+  caption ← "🎬 " ⊕ book.bookName
+  caption ↞ caption ⊕ "\n\n📖 " ⊕ book.introduction
+  caption ↞ caption ⊕ "\n\n🧑‍🤝‍ " ⊕ book.protagonist
+  caption ↞ caption ⊕ "\n " ⊕ tags
+  ⇠ caption
+}
+
+# Format episode caption
+ƒ formatEpisodeCaption(ep) → {
+  ⇠ "🎬 " ⊕ ep.chapterName ⊕ " (720p) ⏳ Auto-deletes in 30m"
+}
+
+# Schedule message deletion
+ƒ scheduleDeletion(bot, chatId, messageId, delay) → {
+  setTimeout(ƒ() → {
+    bot.api.deleteMessage(chatId, messageId).catch(ƒ(err) → {
+      → "⚠️ Failed to auto-delete: " ⊕ err.message
+    })
+  }, delay)
+}
+
+⇠ 🧬 {
+  formatBookCaption: formatBookCaption,
+  formatEpisodeCaption: formatEpisodeCaption,
+  scheduleDeletion: scheduleDeletion
+}
