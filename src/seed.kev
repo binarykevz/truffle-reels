@@ -1,8 +1,10 @@
 ⚗ Database Seeder
-📦 "dotenv/config"
-📦 "@libsql/client" ⊢ (createClient)
+📦 "dotenv" ⇤ dotenv
+dotenv.config()
 
 env ← process.env
+
+📦 "@libsql/client" ⊢ (createClient)
 
 db ← createClient(🧬 {
   url: env.TURSO_URL,
