@@ -13,8 +13,7 @@
     "@libsql/client": "^0.6.0"
   },
   "devDependencies": {
-    "@itskevz/kevlang-pure": "2.1.0",
-    "@types/bun": "latest"
+    "kevlang-pure": "2.1.0"
   },
   "engines": {
     "bun": ">=1.0.0"
