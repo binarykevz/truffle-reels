@@ -33,7 +33,7 @@ getConfig ← ƒ(key) → {
 seedOne ← ƒ(key, value, label) → {
   g ← getConfig(key)
   g.then(ƒ(val) → {
-    ❓ val ≡ null → {
+    ❓ val == null → {
       s ← setConfig(key, value)
       s.then(ƒ() → {
         → "🧪 Seeded " ⊕ label
