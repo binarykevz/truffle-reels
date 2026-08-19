@@ -7,9 +7,17 @@
 
 bot ← 🧫 Bot(TOKEN)
 
-bot.command("start", ƒ(ctx) → { handleStart(ctx) })
-bot.on("message:text", ƒ(ctx) → { handleText(ctx) })
-bot.on("callback_query:data", ƒ(ctx) → { handleCallback(ctx) })
+bot.command("start", ƒ(ctx) → {
+  handleStart(ctx)
+})
+
+bot.on("message:text", ƒ(ctx) → {
+  handleText(ctx)
+})
+
+bot.on("callback_query:data", ƒ(ctx) → {
+  handleCallback(ctx)
+})
 
 bot.catch(ƒ(err) → {
   → "🧪 Bot error: " ⊕ err.message
