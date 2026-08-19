@@ -1,0 +1,14 @@
+⚗ Async Diagnostic
+
+ƒ sideEffect() → {
+  → "side effect ran"
+}
+
+ƒ fetchData() → {
+  res ← fetch("https://api.github.com/zen")
+  ⇠ res.status
+}
+
+sideEffect()
+status ← fetchData()
+→ status
