@@ -1,24 +1,24 @@
 ⚗ Configuration
-# kevlang-pure v2.1.0
+📦 "./db.kev" ⊢ (initDb, getConfig)
 
-📦 "./db.kev" ⊢ (getConfig, initDb)
-
-await initDb()
-
-# Fetch from Turso, fallback to env variables
-TOKEN ← (await getConfig("BOT_TOKEN")) || process.env.BOT_TOKEN
-SEARCH_API ← (await getConfig("SEARCH_API")) || "https://api.sansekai.my.id/api/dramabox/search?query="
-EPISODE_API ← (await getConfig("EPISODE_API")) || "https://api.sansekai.my.id/api/dramabox/allepisode?bookId="
-
-MAX_SEARCH_RESULTS ← 5
-EPISODES_PER_BATCH ← 20
-DELETION_TIME_MS ← 30 × 60 × 1000
-
-⇠ 🧬 {
-  TOKEN: TOKEN,
-  SEARCH_API: SEARCH_API,
-  EPISODE_API: EPISODE_API,
-  MAX_SEARCH_RESULTS: MAX_SEARCH_RESULTS,
-  EPISODES_PER_BATCH: EPISODES_PER_BATCH,
-  DELETION_TIME_MS: DELETION_TIME_MS
+startSequence ← ƒ(botStartCallback) → {
+  initDb()
+  getConfig("BOT_TOKEN").then(ƒ(dbToken) → {
+    TOKEN ← dbToken || process.env.BOT_TOKEN
+    getConfig("SEARCH_API").then(ƒ(dbSearch) → {
+      SEARCH_API ← dbSearch || "https://api.sansekai.my.id/api/dramabox/search?query="
+      getConfig("EPISODE_API").then(ƒ(dbEp) → {
+        EPISODE_API ← dbEp || "https://api.sansekai.my.id/api/dramabox/allepisode?bookId="
+        config ← 🧬 {
+          TOKEN: TOKEN,
+          SEARCH_API: SEARCH_API,
+          EPISODE_API: EPISODE_API,
+          MAX_SEARCH_RESULTS: 5,
+          EPISODES_PER_BATCH: 20,
+          DELETION_TIME_MS: 30 × 60 × 1000
+        }
+        botStartCallback(config)
+      })
+    })
+  })
 }
