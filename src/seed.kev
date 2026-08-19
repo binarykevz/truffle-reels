@@ -1,14 +1,12 @@
 ⚗ Database Seeder
 📦 "@libsql/client" ⊢ (createClient)
 
-db ← createClient(🧬 {
-  url: process.env.TURSO_URL,
-  authToken: process.env.TURSO_TOKEN
-})
+env ← process.env
 
-TOKEN ← process.env.BOT_TOKEN
-SEARCH_API ← "https://api.sansekai.my.id/api/dramabox/search?query="
-EPISODE_API ← "https://api.sansekai.my.id/api/dramabox/allepisode?bookId="
+db ← createClient(🧬 {
+  url: env.TURSO_URL,
+  authToken: env.TURSO_TOKEN
+})
 
 setConfig ← ƒ(key, value) → {
   ⇠ db.execute(🧬 {
@@ -18,28 +16,36 @@ setConfig ← ƒ(key, value) → {
 }
 
 getConfig ← ƒ(key) → {
-  ⇠ db.execute(🧬 {
+  p ← db.execute(🧬 {
     sql: "SELECT value FROM config WHERE key = ?;",
     args: [key]
-  }).then(ƒ(res) → {
-    ❓ res.rows.length > 0 → { ⇠ res.rows[0].value }
+  })
+  ⇠ p.then(ƒ(res) → {
+    rows ← res.rows
+    ❓ rows.length > 0 → {
+      first ← rows[0]
+      ⇠ first.value
+    }
     ⇠ null
   })
 }
 
-runSeed ← ƒ() → {
-  db.execute("CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT NOT NULL);").then(ƒ() → {
-    getConfig("BOT_TOKEN").then(ƒ(val) → {
-      ❓ val ≡ null → { setConfig("BOT_TOKEN", TOKEN).then(ƒ() → { → "🧪 Seeded BOT_TOKEN" }) }
-      getConfig("SEARCH_API").then(ƒ(val2) → {
-        ❓ val2 ≡ null → { setConfig("SEARCH_API", SEARCH_API).then(ƒ() → { → "🧪 Seeded SEARCH_API" }) }
-        getConfig("EPISODE_API").then(ƒ(val3) → {
-          ❓ val3 ≡ null → { setConfig("EPISODE_API", EPISODE_API).then(ƒ() → { → "🧪 Seeded EPISODE_API" }) }
-          → "✅ Database seeding complete."
-        })
+seedOne ← ƒ(key, value, label) → {
+  g ← getConfig(key)
+  g.then(ƒ(val) → {
+    ❓ val ≡ null → {
+      s ← setConfig(key, value)
+      s.then(ƒ() → {
+        → "🧪 Seeded " ⊕ label
       })
-    })
+    }
   })
 }
 
-runSeed()
+ip ← db.execute("CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT NOT NULL);")
+ip.then(ƒ() → {
+  seedOne("BOT_TOKEN", env.BOT_TOKEN, "BOT_TOKEN")
+  seedOne("SEARCH_API", "https://api.sansekai.my.id/api/dramabox/search?query=", "SEARCH_API")
+  seedOne("EPISODE_API", "https://api.sansekai.my.id/api/dramabox/allepisode?bookId=", "EPISODE_API")
+  → "✅ Seeding triggered."
+})
