@@ -1,12 +1,127 @@
-⚗ DramaBox Telegram Bot
-📦 "grammy" ⊢ (Bot)
-📦 "./config.kev" ⊢ (startSequence)
-📦 "./handlers.kev" ⊢ (setupHandlers)
+⚗ DramaBox Telegram Bot (Consolidated)
+📦 "grammy" ⊢ (Bot, InlineKeyboard)
+📦 "@libsql/client" ⊢ (createClient)
 
-startSequence(ƒ(config) → {
-  bot ← 🧫 Bot(config.TOKEN)
-  setupHandlers(bot, config)
-  bot.catch(ƒ(err) → { → "🧪 Bot error: " ⊕ err.message })
-  → "🧪 Bot is running on kevlang-pure v2.1.0..."
-  bot.start()
+# ── DB Setup ──
+db ← createClient(🧬 {
+  url: process.env.TURSO_URL,
+  authToken: process.env.TURSO_TOKEN
+})
+
+initDb ← ƒ() → {
+  db.execute("CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT NOT NULL);").then(ƒ() → {
+    → "🗄️ Database initialized."
+  })
+}
+
+getConfig ← ƒ(key) → {
+  ⇠ db.execute(🧬 {
+    sql: "SELECT value FROM config WHERE key = ?;",
+    args: [key]
+  }).then(ƒ(res) → {
+    ❓ res.rows.length > 0 → { ⇠ res.rows[0].value }
+    ⇠ null
+  })
+}
+
+# ── Helpers ──
+pick720 ← ƒ(ep) → {
+  ∑ cdn ∈ ep.cdnList → {
+    ∑ v ∈ cdn.videoPathList → {
+      ❓ v.quality ≡ 720 → { ⇠ v.videoPath }
+    }
+  }
+  ⇠ ""
+}
+
+scheduleDeletion ← ƒ(bot, chatId, messageId, delay) → {
+  setTimeout(ƒ() → {
+    bot.api.deleteMessage(chatId, messageId).catch(ƒ(err) → {
+      → "⚠️ Failed to auto-delete: " ⊕ err.message
+    })
+  }, delay)
+}
+
+# ── Main Sequence ──
+initDb()
+getConfig("BOT_TOKEN").then(ƒ(dbToken) → {
+  TOKEN ← dbToken || process.env.BOT_TOKEN
+  getConfig("SEARCH_API").then(ƒ(dbSearch) → {
+    SEARCH_API ← dbSearch || "https://api.sansekai.my.id/api/dramabox/search?query="
+    getConfig("EPISODE_API").then(ƒ(dbEp) → {
+      EPISODE_API ← dbEp || "https://api.sansekai.my.id/api/dramabox/allepisode?bookId="
+
+      bot ← 🧫 Bot(TOKEN)
+
+      # ── Handlers ──
+      bot.command("start", ƒ(ctx) → {
+        🔬 { first_name } ← ctx.from
+        kb ← 🧫 InlineKeyboard()
+        kb.text("💘 Love", "sr:love").row()
+        kb.text("🔥 Revenge", "sr:revenge").row()
+        kb.text("👑 CEO", "sr:ceo")
+        ctx.reply("🧪 Welcome to the lab, " ⊕ first_name ⊕ "!\nSend me a drama title.", 🧬 { reply_markup: kb }).then(ƒ(msg) → {
+          scheduleDeletion(bot, msg.chat.id, msg.message_id, 30 × 60 × 1000)
+        })
+      })
+
+      bot.on("message:text", ƒ(ctx) → {
+        query ← ctx.message.text
+        ❓ query.startsWith("/") ≡ false → {
+          ctx.reply("🔍 Searching...").then(ƒ(msg) → { scheduleDeletion(bot, msg.chat.id, msg.message_id, 30 × 60 × 1000) })
+          fetch(SEARCH_API ⊕ encodeURIComponent(query) ⊕ "&lang=en").then(ƒ(res) → {
+            ⇠ res.json()
+          }).then(ƒ(items) → {
+            ❓ items.length ≡ 0 → { ctx.reply("❌ No results.").then(ƒ(m) → { scheduleDeletion(bot, m.chat.id, m.message_id, 30 × 60 × 1000) }) }
+            ⚠ → {
+              ∑ item ∈ items.slice(0, 5) → {
+                caption ← "🎬 " ⊕ item.bookName ⊕ "\n\n📖 " ⊕ item.introduction ⊕ "\n\n🧑‍🤝‍🧑 " ⊕ item.protagonist ⊕ "\n🏷 " ⊕ item.tagNames.join(", ")
+                kb ← 🧫 InlineKeyboard()
+                kb.text("🎞 Get Episodes", "ep:" ⊕ item.bookId ⊕ ":0")
+                ctx.replyWithPhoto(item.cover, 🧬 { caption: caption, reply_markup: kb }).then(ƒ(m) → { scheduleDeletion(bot, m.chat.id, m.message_id, 30 × 60 × 1000) })
+              }
+            }
+          }).catch(ƒ(err) → { ctx.reply("⚠️ Error: " ⊕ err.message) })
+        }
+      })
+
+      bot.on("callback_query:data", ƒ(ctx) → {
+        data ← ctx.callbackQuery.data
+        ctx.answerCallbackQuery()
+        ❓ data.startsWith("sr:") ≡ true → {
+          fetch(SEARCH_API ⊕ encodeURIComponent(data.slice(3)) ⊕ "&lang=en").then(ƒ(res) → { ⇠ res.json() }).then(ƒ(items) → {
+            ∑ item ∈ items.slice(0, 5) → {
+              caption ← "🎬 " ⊕ item.bookName ⊕ "\n\n📖 " ⊕ item.introduction ⊕ "\n\n🧑‍🤝‍🧑 " ⊕ item.protagonist ⊕ "\n🏷 " ⊕ item.tagNames.join(", ")
+              kb ← 🧫 InlineKeyboard()
+              kb.text("🎞 Get Episodes", "ep:" ⊕ item.bookId ⊕ ":0")
+              ctx.replyWithPhoto(item.cover, 🧬 { caption: caption, reply_markup: kb }).then(ƒ(m) → { scheduleDeletion(bot, m.chat.id, m.message_id, 30 × 60 × 1000) })
+            }
+          })
+        } ⚠ ❓ data.startsWith("ep:") ≡ true → {
+          parts ← data.slice(3).split(":")
+          bookId ← parts[0]
+          offset ← Number(parts[1])
+          ctx.reply("📡 Fetching...").then(ƒ(msg) → { scheduleDeletion(bot, msg.chat.id, msg.message_id, 30 × 60 × 1000) })
+          fetch(EPISODE_API ⊕ bookId).then(ƒ(res) → { ⇠ res.json() }).then(ƒ(episodes) → {
+            batch ← episodes.slice(offset, offset ⊕ 20)
+            hasNext ← (offset ⊕ 20) < episodes.length
+            ∑ ep ∈ batch → {
+              video ← pick720(ep)
+              ❓ video ≡ "" → { ↻ }
+              ctx.replyWithVideo(video, 🧬 { caption: "🎬 " ⊕ ep.chapterName ⊕ " (720p) ⏳ Auto-deletes in 30m" }).then(ƒ(m) → { scheduleDeletion(bot, m.chat.id, m.message_id, 30 × 60 × 1000) })
+            }
+            ❓ hasNext ≡ true → {
+              kb ← 🧫 InlineKeyboard()
+              kb.text("➡️ Next 20 Episodes", "ep:" ⊕ bookId ⊕ ":" ⊕ (offset ⊕ 20))
+              ctx.reply("📺 More available:", 🧬 { reply_markup: kb }).then(ƒ(m) → { scheduleDeletion(bot, m.chat.id, m.message_id, 30 × 60 × 1000) })
+            }
+          }).catch(ƒ(err) → { ctx.reply("⚠️ Error: " ⊕ err.message) })
+        }
+      })
+
+      bot.catch(ƒ(err) → { → "🧪 Bot error: " ⊕ err.message })
+      → "🧪 Bot is running on kevlang-pure v2.1.0..."
+      bot.start()
+    })
+  })
 })
