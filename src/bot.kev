@@ -33,13 +33,12 @@ getConfig ← ƒ(key) → {
   })
 }
 
-# 🧪 NEW BULLETPROOF PARSER
+# 🧪 BULLETPROOF PARSER
 getEpisodeData ← ƒ(ep) → {
   cName ← ep.chapterName
   video ← ""
   cdnList ← ep.cdnList
   
-  # Safety check in case an episode has no CDNs
   ❓ cdnList == null → {
     ⇠ 🧬 { chapterName: cName, videoUrl: video }
   }
@@ -51,9 +50,7 @@ getEpisodeData ← ƒ(ep) → {
     }
     ∑ v ∈ vpl → {
       q ← v.quality
-      # Explicitly check for 720p quality
       ❓ q == 720 → {
-        # Only assign if we haven't found a 720p video yet
         ❓ video == "" → {
           video ↞ v.videoPath
         }
@@ -61,7 +58,6 @@ getEpisodeData ← ƒ(ep) → {
     }
   }
   
-  # Return both the chapter name and the extracted 720p URL
   ⇠ 🧬 {
     chapterName: cName,
     videoUrl: video
@@ -153,20 +149,23 @@ initP.then(ƒ() → {
             encoded ← encodeURIComponent(query)
             url ← SEARCH_API ⊕ encoded ⊕ "&lang=en"
             fp ← fetch(url)
-            fp.then(ƒ(res) → {
-              jp ← res.json()
-              jp.then(ƒ(items) → {
-                len ← items.length
-                ❓ len == 0 → {
-                  nr ← ctx.reply("❌ No results.")
-                  nr.then(ƒ(m2) → {
-                    c2 ← m2.chat
-                    scheduleDeletion(bot, c2.id, m2.message_id, DELETE_MS)
-                  })
-                } ⚠ → {
-                  sendSearchResults(ctx, items, bot)
-                }
-              })
+            p1 ← fp.then(ƒ(res) → {
+              ⇠ res.json()
+            })
+            p2 ← p1.then(ƒ(items) → {
+              len ← items.length
+              ❓ len == 0 → {
+                nr ← ctx.reply("❌ No results.")
+                nr.then(ƒ(m2) → {
+                  c2 ← m2.chat
+                  scheduleDeletion(bot, c2.id, m2.message_id, DELETE_MS)
+                })
+              } ⚠ → {
+                sendSearchResults(ctx, items, bot)
+              }
+            })
+            p2.catch(ƒ(err) → {
+              → "DEBUG TEXT SEARCH ERROR: " ⊕ err.message
             })
           }
         })
@@ -177,18 +176,24 @@ initP.then(ƒ() → {
           ctx.answerCallbackQuery()
           isSr ← data.startsWith("sr:")
           isEp ← data.startsWith("ep:")
+          
           ❓ isSr == true → {
             sliced ← data.slice(3)
             encoded ← encodeURIComponent(sliced)
             url ← SEARCH_API ⊕ encoded ⊕ "&lang=en"
             fp ← fetch(url)
-            fp.then(ƒ(res) → {
-              jp ← res.json()
-              jp.then(ƒ(items) → {
-                sendSearchResults(ctx, items, bot)
-              })
+            p1 ← fp.then(ƒ(res) → {
+              ⇠ res.json()
             })
-          } ⚠ ❓ isEp == true → {
+            p2 ← p1.then(ƒ(items) → {
+              sendSearchResults(ctx, items, bot)
+            })
+            p2.catch(ƒ(err) → {
+              → "DEBUG SEARCH CB ERROR: " ⊕ err.message
+            })
+          } 
+          
+          ⚠ ❓ isEp == true → {
             sliced ← data.slice(3)
             parts ← sliced.split(":")
             bookId ← parts[0]
@@ -202,59 +207,66 @@ initP.then(ƒ() → {
               scheduleDeletion(bot, chat.id, m.message_id, DELETE_MS)
             })
             
+            # 🧪 FLAT PROMISE CHAIN FOR EPISODES
             fp ← fetch(epUrl)
-            fpThen ← fp.then(ƒ(res) → {
-              jp ← res.json()
-              jpThen ← jp.then(ƒ(episodes) → {
-                batch ← episodes.slice(offset, offset ⊕ 20)
-                totalLen ← episodes.length
-                hasNext ← (offset ⊕ 20) < totalLen
-                
-                # 🧪 EPISODE PARSING & SENDING LOOP
-                ∑ ep ∈ batch → {
-                  parsedEp ← getEpisodeData(ep)
-                  video ← parsedEp.videoUrl
-                  cName ← parsedEp.chapterName
-                  
-                  → "DEBUG EPISODE: " ⊕ cName ⊕ " | URL: " ⊕ video
-                  
-                  # Skip if no 720p video was found
-                  ❓ video == "" → {
-                    ↻
-                  }
-                  
-                  cap ← "🎬 " ⊕ cName ⊕ " (720p) ⏳ Auto-deletes in 30m"
-                  vr ← ctx.replyWithVideo(video, 🧬 { caption: cap })
-                  
-                  vrThen ← vr.then(ƒ(m4) → {
-                    c4 ← m4.chat
-                    scheduleDeletion(bot, c4.id, m4.message_id, DELETE_MS)
-                  })
-                  vrThen.catch(ƒ(err) → {
-                    → "DEBUG SEND VIDEO ERROR: " ⊕ err.message
-                  })
-                }
-                
-                ❓ hasNext == true → {
-                  kb ← 🧫 InlineKeyboard()
-                  nextOffset ← offset ⊕ 20
-                  kb.text("➡️ Next 20 Episodes", "ep:" ⊕ bookId ⊕ ":" ⊕ nextOffset)
-                  mr ← ctx.reply("📺 More episodes available:", 🧬 { reply_markup: kb })
-                  mrThen ← mr.then(ƒ(m5) → {
-                    c5 ← m5.chat
-                    scheduleDeletion(bot, c5.id, m5.message_id, DELETE_MS)
-                  })
-                  mrThen.catch(ƒ(err) → {
-                    → err.message
-                  })
-                }
-              })
-              jpThen.catch(ƒ(err) → {
-                → "DEBUG JSON ERROR: " ⊕ err.message
-              })
+            p1 ← fp.then(ƒ(res) → {
+              → "DEBUG FETCH STATUS: " ⊕ res.status
+              ⇠ res.json()
             })
-            fpThen.catch(ƒ(err) → {
-              → "DEBUG FETCH ERROR: " ⊕ err.message
+            
+            p2 ← p1.then(ƒ(episodes) → {
+              → "DEBUG EPISODES TYPE: " ⊕ typeof episodes
+              ❓ episodes == null → {
+                ctx.reply("❌ API returned no episodes.")
+                ⇠
+              }
+              len ← episodes.length
+              → "DEBUG EPISODES COUNT: " ⊕ len
+              batch ← episodes.slice(offset, offset ⊕ 20)
+              totalLen ← episodes.length
+              hasNext ← (offset ⊕ 20) < totalLen
+              
+              ∑ ep ∈ batch → {
+                parsedEp ← getEpisodeData(ep)
+                video ← parsedEp.videoUrl
+                cName ← parsedEp.chapterName
+                
+                → "DEBUG EPISODE: " ⊕ cName ⊕ " | URL: " ⊕ video
+                
+                ❓ video == "" → {
+                  ↻
+                }
+                
+                cap ← "🎬 " ⊕ cName ⊕ " (720p) ⏳ Auto-deletes in 30m"
+                vr ← ctx.replyWithVideo(video, 🧬 { caption: cap })
+                
+                vrThen ← vr.then(ƒ(m4) → {
+                  c4 ← m4.chat
+                  scheduleDeletion(bot, c4.id, m4.message_id, DELETE_MS)
+                })
+                vrThen.catch(ƒ(err) → {
+                  → "DEBUG SEND VIDEO ERROR: " ⊕ err.message
+                })
+              }
+              
+              ❓ hasNext == true → {
+                kb ← 🧫 InlineKeyboard()
+                nextOffset ← offset ⊕ 20
+                kb.text("➡️ Next 20 Episodes", "ep:" ⊕ bookId ⊕ ":" ⊕ nextOffset)
+                mr ← ctx.reply("📺 More episodes available:", 🧬 { reply_markup: kb })
+                mrThen ← mr.then(ƒ(m5) → {
+                  c5 ← m5.chat
+                  scheduleDeletion(bot, c5.id, m5.message_id, DELETE_MS)
+                })
+                mrThen.catch(ƒ(err) → {
+                  → err.message
+                })
+              }
+            })
+            
+            p2.catch(ƒ(err) → {
+              → "DEBUG EPISODE CHAIN ERROR: " ⊕ err.message
+              ctx.reply("⚠️ Error fetching episodes: " ⊕ err.message)
             })
           }
         })
