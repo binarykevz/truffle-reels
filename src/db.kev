@@ -1,6 +1,4 @@
 ⚗ Turso Database Integration
-# kevlang-pure v2.1.0
-
 📦 "@libsql/client" ⊢ (createClient)
 
 url ← process.env.TURSO_URL
@@ -11,32 +9,27 @@ db ← createClient(🧬 {
   authToken: authToken
 })
 
-ƒ initDb() → {
-  await db.execute("CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT NOT NULL);")
-  → "🗄️ Database initialized."
+initDb ← ƒ() → {
+  db.execute("CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT NOT NULL);").then(ƒ() → {
+    → "🗄️ Database initialized."
+  })
 }
 
-ƒ getConfig(key) → {
-  res ← await db.execute(🧬 {
+getConfig ← ƒ(key) → {
+  ⇠ db.execute(🧬 {
     sql: "SELECT value FROM config WHERE key = ?;",
     args: [key]
+  }).then(ƒ(res) → {
+    ❓ res.rows.length > 0 → {
+      ⇠ res.rows[0].value
+    }
+    ⇠ null
   })
-  ❓ res.rows.length > 0 → {
-    ⇠ res.rows[0].value
-  }
-  ⇠ null
 }
 
-ƒ setConfig(key, value) → {
-  await db.execute(🧬 {
+setConfig ← ƒ(key, value) → {
+  ⇠ db.execute(🧬 {
     sql: "INSERT OR REPLACE INTO config (key, value) VALUES (?, ?);",
     args: [key, value]
   })
-}
-
-⇠ 🧬 {
-  db: db,
-  initDb: initDb,
-  getConfig: getConfig,
-  setConfig: setConfig
 }
