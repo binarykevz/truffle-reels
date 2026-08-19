@@ -1,0 +1,45 @@
+⚗ Turso Database Integration
+
+📦 "@libsql/client" ⊢ (createClient)
+
+# Turso Credentials (must be in .env)
+url ← process.env.TURSO_URL
+authToken ← process.env.TURSO_TOKEN
+
+db ← createClient(🧬 {
+  url: url,
+  authToken: authToken
+})
+
+# Initialize tables
+ƒ initDb() → {
+  await db.execute("CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT NOT NULL);")
+  → "🗄️ Database initialized."
+}
+
+# Get config value
+ƒ getConfig(key) → {
+  res ← await db.execute(🧬 {
+    sql: "SELECT value FROM config WHERE key = ?;",
+    args: [key]
+  })
+  ❓ res.rows.length > 0 → {
+    ⇠ res.rows[0].value
+  }
+  ⇠ null
+}
+
+# Set config value
+ƒ setConfig(key, value) → {
+  await db.execute(🧬 {
+    sql: "INSERT OR REPLACE INTO config (key, value) VALUES (?, ?);",
+    args: [key, value]
+  })
+}
+
+⇠ 🧬 {
+  db: db,
+  initDb: initDb,
+  getConfig: getConfig,
+  setConfig: setConfig
+}
