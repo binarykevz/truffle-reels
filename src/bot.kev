@@ -184,10 +184,10 @@ initP.then(ƒ() → {
             })
             
             fp ← fetch(epUrl)
-            fp.then(ƒ(res) → {
+            fpThen ← fp.then(ƒ(res) → {
               → "DEBUG FETCH STATUS: " ⊕ res.status
               jp ← res.json()
-              jp.then(ƒ(episodes) → {
+              jpThen ← jp.then(ƒ(episodes) → {
                 → "DEBUG EPISODES COUNT: " ⊕ episodes.length
                 batch ← episodes.slice(offset, offset ⊕ 20)
                 totalLen ← episodes.length
@@ -201,10 +201,11 @@ initP.then(ƒ() → {
                   }
                   cap ← "🎬 " ⊕ ep.chapterName ⊕ " (720p) ⏳ Auto-deletes in 30m"
                   vr ← ctx.replyWithVideo(video, 🧬 { caption: cap })
-                  vr.then(ƒ(m4) → {
+                  vrThen ← vr.then(ƒ(m4) → {
                     c4 ← m4.chat
                     scheduleDeletion(bot, c4.id, m4.message_id, DELETE_MS)
-                  }).catch(ƒ(err) → {
+                  })
+                  vrThen.catch(ƒ(err) → {
                     → "DEBUG SEND VIDEO ERROR: " ⊕ err.message
                   })
                 }
@@ -219,10 +220,12 @@ initP.then(ƒ() → {
                     scheduleDeletion(bot, c5.id, m5.message_id, DELETE_MS)
                   })
                 }
-              }).catch(ƒ(err) → {
+              })
+              jpThen.catch(ƒ(err) → {
                 → "DEBUG JSON ERROR: " ⊕ err.message
               })
-            }).catch(ƒ(err) → {
+            })
+            fpThen.catch(ƒ(err) → {
               → "DEBUG FETCH ERROR: " ⊕ err.message
             })
           }
