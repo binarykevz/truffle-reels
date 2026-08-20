@@ -5,9 +5,9 @@
 dotenv.config()
 
 env ← 🧬 {
-  TURSO_URL: "libsql://truffle-reels-binarykevz.aws-ap-northeast-1.turso.io",
-  TURSO_TOKEN: "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODcxMTkxOTYsImlkIjoiMDFhMDE4OWEtYjYwMS03ZjQ4LWEwYTUtY2M5OWJmZWRiYWQ3Iiwia2lkIjoieEtDYUItRmtDYXFYSFRCZGkzeHJlUVBhOEtRV3dvd1EtXy1PUWsxWWp6byIsInJpZCI6IjFhMDcxYzVlLWRhZWQtNGU1MC1hODgyLWJmYzFkOTc1OTRiMyJ9.-xww29ZVwVrVIbplmDR8NeDv7lpBXCwgbAnM5ASRwnSG1Buz8aSNQYKLsxSKA3fS7yGTpxp509q8Rpn5-Ks7DQ",
-  BOT_TOKEN: "8970715595:AAHOvqlKVKbTnpxSPNlFAT1Lp35ZV8TKLDs"
+  TURSO_URL: "libsql://your-turso-db.turso.io",
+  TURSO_TOKEN: "pBXCwgbAnM5ASRwnSG1Buz8aSNQYKLsxSKA3fS7yGTpxp509q8Rpn5-Ks7DQ",
+  BOT_TOKEN: "89536464xvcbdhgdgvbc"
 }
 
 db ← createClient(🧬 {
@@ -52,7 +52,7 @@ seedOne ← ƒ(key, value, label) → {
 ip ← db.execute("CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT NOT NULL);")
 ip.then(ƒ() → {
   seedOne("BOT_TOKEN", env.BOT_TOKEN, "BOT_TOKEN")
-  seedOne("SEARCH_API", "https://api.sansekai.my.id/api/dramabox/search?query=", "SEARCH_API")
-  seedOne("EPISODE_API", "https://api.sansekai.my.id/api/dramabox/allepisode?bookId=", "EPISODE_API")
+  seedOne("SEARCH_API", "api?query=", "SEARCH_API")
+  seedOne("EPISODE_API", api?bookId=", "EPISODE_API")
   → "✅ Seeding triggered."
 })
