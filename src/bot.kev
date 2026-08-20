@@ -1,6 +1,6 @@
 ⚗ DramaBox Telegram Bot (Consolidated)
 📦 "dotenv" ⇤ dotenv
-📦 "grammy" ⊢ (Bot, InlineKeyboard, InputFile)
+📦 "grammy" ⊢ (Bot, InlineKeyboard, InputFile, GrammyError)
 📦 "@libsql/client" ⊢ (createClient)
 
 dotenv.config()
@@ -13,6 +13,7 @@ env ← 🧬 {
 
 DELETE_MS ← 30 × 60 × 1000
 COLS ← 5
+MAX_VIDEO_SIZE ← 50 × 1024 × 1024
 
 db ← createClient(🧬 {
   url: env.TURSO_URL,
@@ -87,6 +88,7 @@ extractArray ← ƒ(response) → {
   ⇠ null
 }
 
+# 🧪 UPDATED: Specifically targets 720p to keep file sizes small
 getEpisodeData ← ƒ(ep) → {
   cName ← ep.chapterName
   video ← ""
@@ -108,16 +110,27 @@ getEpisodeData ← ƒ(ep) → {
         ❓ vpl != null → {
           vplLen ← vpl.length
           ❓ vplLen > 0 → {
-            v ← null
+            fallbackV ← null
+            targetV ← null
+            
             ∑ vp ∈ vpl → {
-              ❓ v == null → {
-                v ↞ vp
+              ❓ fallbackV == null → {
+                fallbackV ↞ vp
+              }
+              q ← Number(vp.quality)
+              ❓ q == 720 → {
+                ❓ targetV == null → {
+                  targetV ↞ vp
+                }
               }
             }
             
-            ❓ v != null → {
-              video ↞ v.videoPath
-              qStr ↞ v.quality
+            ❓ targetV != null → {
+              video ↞ targetV.videoPath
+              qStr ↞ targetV.quality
+            } ⚠ ❓ fallbackV != null → {
+              video ↞ fallbackV.videoPath
+              qStr ↞ fallbackV.quality
             }
           }
         }
@@ -186,6 +199,54 @@ sendSearchResults ← ƒ(ctx, items, botRef) → {
   }
 }
 
+sendVideoSafely ← ƒ(ctx, bot, streamUrl, cName, qStr) → {
+  cap ← "🎬 " ⊕ cName ⊕ " • " ⊕ qStr ⊕ "p\n⏳ Auto-deletes in 30m"
+  
+  vfp ← fetch(streamUrl)
+  vfp.then(ƒ(vres) → {
+    contentLength ← vres.headers.get("content-length")
+    fileSize ← 0
+    ❓ contentLength != null → {
+      fileSize ↞ Number(contentLength)
+    }
+    
+    ❓ fileSize > MAX_VIDEO_SIZE → {
+      → "⚠️ Video too large (" ⊕ fileSize ⊕ " bytes), sending link instead"
+      linkMsg ← "🎬 " ⊕ cName ⊕ " • " ⊕ qStr ⊕ "p\n\n⚠️ Video too large to upload directly.\n🔗 Watch online: " ⊕ streamUrl
+      lm ← ctx.reply(linkMsg)
+      lm.then(ƒ(lmMsg) → {
+        scheduleDeletion(bot, lmMsg.chat.id, lmMsg.message_id, DELETE_MS)
+      })
+      ⇠
+    }
+    
+    videoStream ← vres.body
+    videoFile ← 🧫 InputFile(videoStream, cName ⊕ ".mp4")
+    
+    vr ← ctx.replyWithVideo(videoFile, 🧬 { caption: cap })
+    
+    vr.then(ƒ(m4) → {
+      scheduleDeletion(bot, m4.chat.id, m4.message_id, DELETE_MS)
+    })
+    
+    vr.catch(ƒ(err) → {
+      → "⚠️ Video upload failed: " ⊕ err.message
+      → "📎 Falling back to link..."
+      
+      linkMsg ← "🎬 " ⊕ cName ⊕ " • " ⊕ qStr ⊕ "p\n\n⚠️ Could not upload video directly.\n🔗 Watch online: " ⊕ streamUrl
+      lm ← ctx.reply(linkMsg)
+      lm.then(ƒ(lmMsg) → {
+        scheduleDeletion(bot, lmMsg.chat.id, lmMsg.message_id, DELETE_MS)
+      })
+    })
+  })
+  
+  vfp.catch(ƒ(err) → {
+    → "⚠️ Download failed: " ⊕ err.message
+    ctx.reply("⚠️ Failed to fetch video")
+  })
+}
+
 initP ← db.execute("CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT NOT NULL);")
 initP.then(ƒ() → {
   → "🗄️ Database ready."
@@ -197,16 +258,15 @@ initP.then(ƒ() → {
       TOKEN ↞ env.BOT_TOKEN
     }
     
-    # 🧪 LOAD APIs EXCLUSIVELY FROM TURSO
     t2 ← getConfig("SEARCH_API")
     t2.then(ƒ(dbSearch) → {
       SEARCH_API ← dbSearch
       ❓ dbSearch == null → {
         SEARCH_API ↞ ""
         → "⚠️ SEARCH_API not found in Turso!"
-        → "💡 Add it via: INSERT INTO config (key, value) VALUES ('SEARCH_API', 'your_url')"
+        → "💡 Add via: INSERT INTO config (key, value) VALUES ('SEARCH_API', 'your_url')"
       } ⚠ → {
-        → "✅ SEARCH_API loaded from Turso"
+        → "✅ SEARCH_API loaded"
       }
       
       t3 ← getConfig("EPISODE_API")
@@ -215,9 +275,9 @@ initP.then(ƒ() → {
         ❓ dbEpisode == null → {
           EPISODE_API ↞ ""
           → "⚠️ EPISODE_API not found in Turso!"
-          → "💡 Add it via: INSERT INTO config (key, value) VALUES ('EPISODE_API', 'your_url')"
+          → "💡 Add via: INSERT INTO config (key, value) VALUES ('EPISODE_API', 'your_url')"
         } ⚠ → {
-          → "✅ EPISODE_API loaded from Turso"
+          → "✅ EPISODE_API loaded"
         }
 
         bot ← 🧫 Bot(TOKEN)
@@ -232,8 +292,7 @@ initP.then(ƒ() → {
           kb.text("🔮 Fantasy", "sr:fantasy")
           rp ← ctx.reply("✨ Welcome, " ⊕ first_name ⊕ "!\n\n🎭 Send me a drama title to search.", 🧬 { reply_markup: kb })
           rp.then(ƒ(m) → {
-            chat ← m.chat
-            scheduleDeletion(bot, chat.id, m.message_id, DELETE_MS)
+            scheduleDeletion(bot, m.chat.id, m.message_id, DELETE_MS)
           })
         })
 
@@ -243,13 +302,12 @@ initP.then(ƒ() → {
           isCmd ← query.startsWith("/")
           ❓ isCmd == false → {
             ❓ SEARCH_API == "" → {
-              ctx.reply("⚠️ Search API not configured in database.")
+              ctx.reply("⚠️ Search API not configured.")
               ⇠
             }
             rp ← ctx.reply("🔍 Searching...")
             rp.then(ƒ(m) → {
-              chat ← m.chat
-              scheduleDeletion(bot, chat.id, m.message_id, DELETE_MS)
+              scheduleDeletion(bot, m.chat.id, m.message_id, DELETE_MS)
             })
             encoded ← encodeURIComponent(query)
             url ← SEARCH_API ⊕ encoded ⊕ "&lang=en"
@@ -269,8 +327,7 @@ initP.then(ƒ() → {
               ❓ len == 0 → {
                 nr ← ctx.reply("❌ No results found.")
                 nr.then(ƒ(m2) → {
-                  c2 ← m2.chat
-                  scheduleDeletion(bot, c2.id, m2.message_id, DELETE_MS)
+                  scheduleDeletion(bot, m2.chat.id, m2.message_id, DELETE_MS)
                 })
               } ⚠ → {
                 sendSearchResults(ctx, items, bot)
@@ -332,8 +389,7 @@ initP.then(ƒ() → {
             
             rp ← ctx.reply("⏳ Loading episodes...")
             rp.then(ƒ(m) → {
-              chat ← m.chat
-              scheduleDeletion(bot, chat.id, m.message_id, DELETE_MS)
+              scheduleDeletion(bot, m.chat.id, m.message_id, DELETE_MS)
             })
             
             fetchPromise ← fetchEpisodesForBook(bookId, EPISODE_API)
@@ -364,8 +420,7 @@ initP.then(ƒ() → {
               header ← "🎬 𝗘𝗽𝗶𝘀𝗼𝗱𝗲𝘀\n━━━━━━━━━━━\n📺 Total: " ⊕ len ⊕ " episodes\n👇 Tap to watch:"
               mr ← ctx.reply(header, 🧬 { reply_markup: kb })
               mr.then(ƒ(m5) → {
-                chat ← m5.chat
-                scheduleDeletion(bot, chat.id, m5.message_id, DELETE_MS)
+                scheduleDeletion(bot, m5.chat.id, m5.message_id, DELETE_MS)
               })
             })
             fetchPromise.catch(ƒ(err) → {
@@ -393,8 +448,7 @@ initP.then(ƒ() → {
             
             rp ← ctx.reply("🔓 Decrypting...")
             rp.then(ƒ(m) → {
-              chat ← m.chat
-              scheduleDeletion(bot, chat.id, m.message_id, DELETE_MS)
+              scheduleDeletion(bot, m.chat.id, m.message_id, DELETE_MS)
             })
             
             fetchPromise ← fetchEpisodesForBook(bookId, EPISODE_API)
@@ -438,34 +492,7 @@ initP.then(ƒ() → {
                   ⇠
                 }
                 
-                cap ← "🎬 " ⊕ cName ⊕ " • " ⊕ qStr ⊕ "p\n⏳ Auto-deletes in 30m"
-                
-                vfp ← fetch(streamUrl)
-                vfp.then(ƒ(vres) → {
-                  videoStream ← vres.body
-                  videoFile ← 🧫 InputFile(videoStream, cName ⊕ ".mp4")
-                  
-                  vr ← ctx.replyWithVideo(videoFile, 🧬 { caption: cap })
-                  
-                  vr.then(ƒ(m4) → {
-                    chat ← m4.chat
-                    scheduleDeletion(bot, chat.id, m4.message_id, DELETE_MS)
-                  })
-                  
-                  vr.catch(ƒ(err) → {
-                    → "VIDEO SEND FAILED: " ⊕ err.message
-                    fallbackMsg ← "⚠️ Upload failed.\n🔗 " ⊕ streamUrl
-                    fr ← ctx.reply(fallbackMsg)
-                    fr.then(ƒ(fm) → {
-                      chat ← fm.chat
-                      scheduleDeletion(bot, chat.id, fm.message_id, DELETE_MS)
-                    })
-                  })
-                })
-                
-                vfp.catch(ƒ(err) → {
-                  ctx.reply("⚠️ Download failed")
-                })
+                sendVideoSafely(ctx, bot, streamUrl, cName, qStr)
               })
               
               dp.catch(ƒ(err) → {
@@ -482,7 +509,7 @@ initP.then(ƒ() → {
           → "🧪 Bot error: " ⊕ err.message
         })
 
-        → "🧪 Bot running • APIs loaded from Turso"
+        → "🧪 Bot running • APIs from Turso"
         bot.start()
       })
     })
