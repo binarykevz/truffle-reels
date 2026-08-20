@@ -33,7 +33,7 @@ getConfig ← ƒ(key) → {
   })
 }
 
-# 🧪 CORRECTED PARSER: Targets isDefault == 1 CDN
+# 🧪 PARSE EPISODE: Get 720p from isDefault=1 CDN
 getEpisodeData ← ƒ(ep) → {
   cName ← ep.chapterName
   video ← ""
@@ -43,7 +43,7 @@ getEpisodeData ← ƒ(ep) → {
     ⇠ 🧬 { chapterName: cName, videoUrl: video }
   }
   
-  # Step 1: Look for 720p specifically in the default CDN (isDefault == 1)
+  # Look for 720p in default CDN (isDefault == 1)
   ∑ cdn ∈ cdnList → {
     isDef ← Number(cdn.isDefault)
     ❓ isDef == 1 → {
@@ -61,7 +61,7 @@ getEpisodeData ← ƒ(ep) → {
     }
   }
   
-  # Step 2: Fallback - if not found in default CDN, search all CDNs for 720p
+  # Fallback: search all CDNs for 720p
   ❓ video == "" → {
     ∑ cdn ∈ cdnList → {
       vpl ← cdn.videoPathList
@@ -82,6 +82,15 @@ getEpisodeData ← ƒ(ep) → {
     chapterName: cName,
     videoUrl: video
   }
+}
+
+# 🧪 DECRYPT VIDEO URL
+decryptVideo ← ƒ(encryptedUrl) → {
+  decryptUrl ← "https://api.sansekai.my.id/api/dramabox/decrypt?url=" ⊕ encodeURIComponent(encryptedUrl)
+  fp ← fetch(decryptUrl)
+  ⇠ fp.then(ƒ(res) → {
+    ⇠ res.json()
+  })
 }
 
 scheduleDeletion ← ƒ(botRef, chatId, messageId, delay) → {
@@ -220,7 +229,7 @@ initP.then(ƒ() → {
             offsetStr ← parts[1]
             offset ← Number(offsetStr)
             
-            epUrl ← EPISODE_API ⊕ bookId ⊕ "&lang=en"
+            epUrl ← EPISODE_API ⊕ bookId
             rp ← ctx.reply("📡 Fetching episodes...")
             rp.then(ƒ(m) → {
               chat ← m.chat
@@ -238,11 +247,6 @@ initP.then(ƒ() → {
                 ⇠
               }
               
-              # Handle case where API wraps data in an object
-              ❓ episodes.data != null → {
-                episodes ↞ episodes.data
-              }
-              
               len ← episodes.length
               → "DEBUG EPISODES COUNT: " ⊕ len
               
@@ -257,24 +261,39 @@ initP.then(ƒ() → {
               
               ∑ ep ∈ batch → {
                 parsedEp ← getEpisodeData(ep)
-                video ← parsedEp.videoUrl
+                encryptedVideo ← parsedEp.videoUrl
                 cName ← parsedEp.chapterName
                 
-                → "DEBUG EPISODE: " ⊕ cName ⊕ " | URL: " ⊕ video
-                
-                ❓ video == "" → {
+                ❓ encryptedVideo == "" → {
                   ↻
                 }
                 
-                cap ← "🎬 " ⊕ cName ⊕ " (720p) ⏳ Auto-deletes in 30m"
-                vr ← ctx.replyWithVideo(video, 🧬 { caption: cap })
+                → "DEBUG DECRYPTING: " ⊕ cName
                 
-                vrThen ← vr.then(ƒ(m4) → {
-                  c4 ← m4.chat
-                  scheduleDeletion(bot, c4.id, m4.message_id, DELETE_MS)
+                # 🧪 DECRYPT THE VIDEO URL
+                dp ← decryptVideo(encryptedVideo)
+                dp.then(ƒ(decryptResult) → {
+                  streamUrl ← decryptResult.streamUrl
+                  → "DEBUG STREAM URL: " ⊕ streamUrl
+                  
+                  ❓ streamUrl == null → {
+                    → "⚠️ Decrypt failed for " ⊕ cName
+                    ↻
+                  }
+                  
+                  cap ← "🎬 " ⊕ cName ⊕ " (720p) ⏳ Auto-deletes in 30m"
+                  vr ← ctx.replyWithVideo(streamUrl, 🧬 { caption: cap })
+                  
+                  vrThen ← vr.then(ƒ(m4) → {
+                    c4 ← m4.chat
+                    scheduleDeletion(bot, c4.id, m4.message_id, DELETE_MS)
+                  })
+                  vrThen.catch(ƒ(err) → {
+                    → "DEBUG SEND VIDEO ERROR: " ⊕ err.message
+                  })
                 })
-                vrThen.catch(ƒ(err) → {
-                  → "DEBUG SEND VIDEO ERROR: " ⊕ err.message
+                dp.catch(ƒ(err) → {
+                  → "⚠️ Decrypt error for " ⊕ cName ⊕ ": " ⊕ err.message
                 })
               }
               
