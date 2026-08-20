@@ -13,7 +13,6 @@ env ← 🧬 {
 
 DELETE_MS ← 30 × 60 × 1000
 
-# 🧪 TOP-LEVEL API URLs (accessible by all functions)
 SEARCH_API ← "https://api.sansekai.my.id/api/dramabox/search?query="
 EPISODE_API ← "https://api.sansekai.my.id/api/dramabox/allepisode?bookId="
 
@@ -42,6 +41,50 @@ getConfig ← ƒ(key) → {
     }
     ⇠ null
   })
+}
+
+# 🧪 GENERIC ARRAY EXTRACTOR (works for both search and episodes)
+extractArray ← ƒ(response) → {
+  ❓ response == null → {
+    ⇠ null
+  }
+  
+  ❓ response.length != null → {
+    ⇠ response
+  }
+  
+  ❓ response.data != null → {
+    ❓ response.data.length != null → {
+      ⇠ response.data
+    }
+    ❓ response.data.list != null → {
+      ⇠ response.data.list
+    }
+    ❓ response.data.result != null → {
+      ⇠ response.data.result
+    }
+    ❓ response.data.items != null → {
+      ⇠ response.data.items
+    }
+  }
+  
+  ❓ response.result != null → {
+    ⇠ response.result
+  }
+  
+  ❓ response.list != null → {
+    ⇠ response.list
+  }
+  
+  ❓ response.items != null → {
+    ⇠ response.items
+  }
+  
+  ❓ response.episodes != null → {
+    ⇠ response.episodes
+  }
+  
+  ⇠ null
 }
 
 getEpisodeData ← ƒ(ep) → {
@@ -89,49 +132,6 @@ getEpisodeData ← ƒ(ep) → {
   }
 }
 
-extractEpisodes ← ƒ(response) → {
-  ❓ response == null → {
-    ⇠ null
-  }
-  
-  ❓ response.length != null → {
-    ⇠ response
-  }
-  
-  ❓ response.data != null → {
-    ❓ response.data.length != null → {
-      ⇠ response.data
-    }
-    ❓ response.data.list != null → {
-      ⇠ response.data.list
-    }
-    ❓ response.data.episodes != null → {
-      ⇠ response.data.episodes
-    }
-    ❓ response.data.result != null → {
-      ⇠ response.data.result
-    }
-  }
-  
-  ❓ response.result != null → {
-    ⇠ response.result
-  }
-  
-  ❓ response.episodes != null → {
-    ⇠ response.episodes
-  }
-  
-  ❓ response.list != null → {
-    ⇠ response.list
-  }
-  
-  ❓ response.items != null → {
-    ⇠ response.items
-  }
-  
-  ⇠ null
-}
-
 fetchAllEpisodes ← ƒ(bookId, page, collected) → {
   ❓ page > 20 → {
     ⇠ collected
@@ -143,7 +143,7 @@ fetchAllEpisodes ← ƒ(bookId, page, collected) → {
     ⇠ res.json()
   })
   ⇠ p1.then(ƒ(response) → {
-    epList ← extractEpisodes(response)
+    epList ← extractArray(response)
     
     ❓ epList == null → {
       ⇠ collected
@@ -247,7 +247,15 @@ initP.then(ƒ() → {
         p1 ← fp.then(ƒ(res) → {
           ⇠ res.json()
         })
-        p2 ← p1.then(ƒ(items) → {
+        p2 ← p1.then(ƒ(response) → {
+          # 🧪 EXTRACT ARRAY FROM SEARCH RESPONSE
+          items ← extractArray(response)
+          
+          ❓ items == null → {
+            ctx.reply("❌ Could not parse search results.")
+            ⇠
+          }
+          
           len ← items.length
           ❓ len == 0 → {
             nr ← ctx.reply("❌ No results.")
@@ -282,8 +290,21 @@ initP.then(ƒ() → {
         p1 ← fp.then(ƒ(res) → {
           ⇠ res.json()
         })
-        p2 ← p1.then(ƒ(items) → {
-          sendSearchResults(ctx, items, bot)
+        p2 ← p1.then(ƒ(response) → {
+          # 🧪 EXTRACT ARRAY FROM SEARCH RESPONSE
+          items ← extractArray(response)
+          
+          ❓ items == null → {
+            ctx.reply("❌ Could not parse search results.")
+            ⇠
+          }
+          
+          len ← items.length
+          ❓ len == 0 → {
+            ctx.reply("❌ No results.")
+          } ⚠ → {
+            sendSearchResults(ctx, items, bot)
+          }
         })
         p2.catch(ƒ(err) → {
           → "DEBUG SEARCH CB ERROR: " ⊕ err.message
