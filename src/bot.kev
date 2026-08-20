@@ -1,6 +1,6 @@
 ⚗ DramaBox Telegram Bot (Consolidated)
 📦 "dotenv" ⇤ dotenv
-📦 "grammy" ⊢ (Bot, InlineKeyboard)
+📦 "grammy" ⊢ (Bot, InlineKeyboard, InputFile)
 📦 "@libsql/client" ⊢ (createClient)
 
 dotenv.config()
@@ -40,7 +40,6 @@ getConfig ← ƒ(key) → {
   })
 }
 
-# 🧪 SAFE PARSER: Uses loops instead of array indexing
 getEpisodeData ← ƒ(ep) → {
   cName ← ep.chapterName
   video ← ""
@@ -323,7 +322,6 @@ initP.then(ƒ() → {
             ⇠
           }
           
-          # 🧪 SAFE INDEX LOOKUP (Bypasses array indexing bugs)
           targetEp ← null
           currentIndex ← 0
           ∑ e ∈ episodes → {
@@ -358,21 +356,34 @@ initP.then(ƒ() → {
             }
             
             cap ← "🎬 " ⊕ cName ⊕ " (" ⊕ qStr ⊕ "p) ⏳ Auto-deletes in 30m"
-            vr ← ctx.replyWithVideo(streamUrl, 🧬 { caption: cap })
             
-            vr.then(ƒ(m4) → {
-              chat ← m4.chat
-              scheduleDeletion(bot, chat.id, m4.message_id, DELETE_MS)
+            # 🧪 CONVERT TO PLAYABLE VIDEO BY STREAMING THROUGH BOT
+            vfp ← fetch(streamUrl)
+            vfp.then(ƒ(vres) → {
+              videoStream ← vres.body
+              videoFile ← 🧫 InputFile(videoStream, cName ⊕ ".mp4")
+              
+              vr ← ctx.replyWithVideo(videoFile, 🧬 { caption: cap })
+              
+              vr.then(ƒ(m4) → {
+                chat ← m4.chat
+                scheduleDeletion(bot, chat.id, m4.message_id, DELETE_MS)
+              })
+              
+              vr.catch(ƒ(err) → {
+                → "⚠️ Video send failed for " ⊕ cName ⊕ ": " ⊕ err.message
+                fallbackMsg ← "⚠️ Video too large or format unsupported. Link:\n🔗 " ⊕ streamUrl
+                fr ← ctx.reply(fallbackMsg)
+                fr.then(ƒ(fm) → {
+                  chat ← fm.chat
+                  scheduleDeletion(bot, chat.id, fm.message_id, DELETE_MS)
+                })
+              })
             })
             
-            vr.catch(ƒ(err) → {
-              → "⚠️ Video send failed for " ⊕ cName ⊕ ": " ⊕ err.message
-              fallbackMsg ← "🎬 " ⊕ cName ⊕ " (" ⊕ qStr ⊕ "p)\n🔗 " ⊕ streamUrl
-              fr ← ctx.reply(fallbackMsg)
-              fr.then(ƒ(fm) → {
-                chat ← fm.chat
-                scheduleDeletion(bot, chat.id, fm.message_id, DELETE_MS)
-              })
+            vfp.catch(ƒ(err) → {
+              → "⚠️ Video download failed for " ⊕ cName ⊕ ": " ⊕ err.message
+              ctx.reply("⚠️ Failed to download video for " ⊕ cName)
             })
           })
           
