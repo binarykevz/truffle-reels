@@ -33,56 +33,45 @@ getConfig ← ƒ(key) → {
   })
 }
 
-# 🧪 PARSE EPISODE: Get 720p from isDefault=1 CDN
+# 🧪 SIMPLIFIED PARSER: Just grab the first video from the default CDN
 getEpisodeData ← ƒ(ep) → {
   cName ← ep.chapterName
   video ← ""
+  qStr ← ""
   cdnList ← ep.cdnList
   
   ❓ cdnList == null → {
-    ⇠ 🧬 { chapterName: cName, videoUrl: video }
+    ⇠ 🧬 { chapterName: cName, videoUrl: video, quality: qStr }
   }
   
+  # Find the default CDN, fallback to the first one
+  targetCdn ← cdnList[0]
   ∑ cdn ∈ cdnList → {
     isDef ← Number(cdn.isDefault)
     ❓ isDef == 1 → {
-      vpl ← cdn.videoPathList
-      ❓ vpl != null → {
-        ∑ v ∈ vpl → {
-          q ← Number(v.quality)
-          ❓ q == 720 → {
-            ❓ video == "" → {
-              video ↞ v.videoPath
-            }
-          }
-        }
-      }
+      targetCdn ↞ cdn
     }
   }
   
-  ❓ video == "" → {
-    ∑ cdn ∈ cdnList → {
-      vpl ← cdn.videoPathList
-      ❓ vpl != null → {
-        ∑ v ∈ vpl → {
-          q ← Number(v.quality)
-          ❓ q == 720 → {
-            ❓ video == "" → {
-              video ↞ v.videoPath
-            }
-          }
-        }
-      }
+  # Grab the very first video path from that CDN
+  vpl ← targetCdn.videoPathList
+  ❓ vpl != null → {
+    vLen ← vpl.length
+    ❓ vLen > 0 → {
+      firstVid ← vpl[0]
+      video ↞ firstVid.videoPath
+      qStr ↞ firstVid.quality
     }
   }
   
   ⇠ 🧬 {
     chapterName: cName,
-    videoUrl: video
+    videoUrl: video,
+    quality: qStr
   }
 }
 
-# 🧪 DECRYPT VIDEO URL (matching your example exactly)
+# 🧪 DECRYPT VIDEO URL
 decryptVideo ← ƒ(videoPath) → {
   decryptUrl ← "https://api.sansekai.my.id/api/dramabox/decrypt?url=" ⊕ encodeURIComponent(videoPath)
   fp ← fetch(decryptUrl)
@@ -139,7 +128,7 @@ initP.then(ƒ() → {
         SEARCH_API ↞ "https://api.sansekai.my.id/api/dramabox/search?query="
       }
       t3 ← getConfig("EPISODE_API")
-      t3.then(ƒ(dbEp) → {
+    t3.then(ƒ(dbEp) → {
         EPISODE_API ← dbEp
         ❓ dbEp == null → {
           EPISODE_API ↞ "https://api.sansekai.my.id/api/dramabox/allepisode?bookId="
@@ -261,6 +250,7 @@ initP.then(ƒ() → {
                 parsedEp ← getEpisodeData(ep)
                 encryptedVideo ← parsedEp.videoUrl
                 cName ← parsedEp.chapterName
+                qStr ← parsedEp.quality
                 
                 ❓ encryptedVideo == "" → {
                   ↻
@@ -268,19 +258,16 @@ initP.then(ƒ() → {
                 
                 → "🔐 Decrypting: " ⊕ cName
                 
-                # 🧪 DECRYPT AND SEND (matching your example)
                 dp ← decryptVideo(encryptedVideo)
                 dp.then(ƒ(decryptResult) → {
-                  # Extract streamUrl from the decrypt response
                   streamUrl ← decryptResult.streamUrl
-                  → "✅ Stream URL: " ⊕ streamUrl
                   
                   ❓ streamUrl == null → {
                     → "⚠️ Decrypt failed for " ⊕ cName
                     ⇠
                   }
                   
-                  cap ← "🎬 " ⊕ cName ⊕ " (720p) ⏳ Auto-deletes in 30m"
+                  cap ← "🎬 " ⊕ cName ⊕ " (" ⊕ qStr ⊕ "p) ⏳ Auto-deletes in 30m"
                   vr ← ctx.replyWithVideo(streamUrl, 🧬 { caption: cap })
                   
                   vrThen ← vr.then(ƒ(m4) → {
