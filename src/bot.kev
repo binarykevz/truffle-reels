@@ -33,7 +33,6 @@ getConfig ← ƒ(key) → {
   })
 }
 
-# 🧪 SIMPLIFIED PARSER: Just grab the first video from the default CDN
 getEpisodeData ← ƒ(ep) → {
   cName ← ep.chapterName
   video ← ""
@@ -69,7 +68,6 @@ getEpisodeData ← ƒ(ep) → {
   }
 }
 
-# 🧪 DECRYPT VIDEO URL
 decryptVideo ← ƒ(videoPath) → {
   decryptUrl ← "https://api.sansekai.my.id/api/dramabox/decrypt?url=" ⊕ encodeURIComponent(videoPath)
   fp ← fetch(decryptUrl)
@@ -109,7 +107,6 @@ sendSearchResults ← ƒ(ctx, items, botRef) → {
   }
 }
 
-# ── Boot sequence ──
 initP ← db.execute("CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT NOT NULL);")
 initP.then(ƒ() → {
   → "🗄️ Database initialized."
@@ -214,7 +211,7 @@ initP.then(ƒ() → {
             offsetStr ← parts[1]
             offset ← Number(offsetStr)
             
-            # 🧪 FIXED: Removed &lang=en to match your get_episodes code
+            # ✅ EXACT MATCH: No &lang=en, just bookId
             epUrl ← EPISODE_API ⊕ bookId
             
             rp ← ctx.reply("📡 Fetching episodes...")
