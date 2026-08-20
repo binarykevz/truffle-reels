@@ -276,9 +276,10 @@ initP.then(ƒ() → {
                   streamUrl ← decryptResult.streamUrl
                   → "DEBUG STREAM URL: " ⊕ streamUrl
                   
+                  # 🧪 FIXED: Changed ↻ to ⇠ (return) because we are inside a .then() callback
                   ❓ streamUrl == null → {
                     → "⚠️ Decrypt failed for " ⊕ cName
-                    ↻
+                    ⇠
                   }
                   
                   cap ← "🎬 " ⊕ cName ⊕ " (720p) ⏳ Auto-deletes in 30m"
