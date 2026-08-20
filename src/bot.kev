@@ -26,13 +26,21 @@ getConfig ← ƒ(key) → {
   ⇠ p.then(ƒ(res) → {
     rows ← res.rows
     ❓ rows.length > 0 → {
-      first ← rows[0]
-      ⇠ first.value
+      first ← null
+      ∑ r ∈ rows → {
+        ❓ first == null → {
+          first ↞ r
+        }
+      }
+      ❓ first != null → {
+        ⇠ first.value
+      }
     }
     ⇠ null
   })
 }
 
+# 🧪 SAFE PARSER: Uses loops instead of array indexing
 getEpisodeData ← ƒ(ep) → {
   cName ← ep.chapterName
   video ← ""
@@ -42,14 +50,30 @@ getEpisodeData ← ƒ(ep) → {
   ❓ cdnList != null → {
     cdnLen ← cdnList.length
     ❓ cdnLen > 0 → {
-      cdn ← cdnList[0]
-      vpl ← cdn.videoPathList
-      ❓ vpl != null → {
-        vplLen ← vpl.length
-        ❓ vplLen > 0 → {
-          v ← vpl[0]
-          video ↞ v.videoPath
-          qStr ↞ v.quality
+      cdn ← null
+      ∑ c ∈ cdnList → {
+        ❓ cdn == null → {
+          cdn ↞ c
+        }
+      }
+      
+      ❓ cdn != null → {
+        vpl ← cdn.videoPathList
+        ❓ vpl != null → {
+          vplLen ← vpl.length
+          ❓ vplLen > 0 → {
+            v ← null
+            ∑ vp ∈ vpl → {
+              ❓ v == null → {
+                v ↞ vp
+              }
+            }
+            
+            ❓ v != null → {
+              video ↞ v.videoPath
+              qStr ↞ v.quality
+            }
+          }
         }
       }
     }
@@ -299,8 +323,22 @@ initP.then(ƒ() → {
             ⇠
           }
           
-          ep ← episodes[epIndex]
-          parsedEp ← getEpisodeData(ep)
+          # 🧪 SAFE INDEX LOOKUP (Bypasses array indexing bugs)
+          targetEp ← null
+          currentIndex ← 0
+          ∑ e ∈ episodes → {
+            ❓ currentIndex == epIndex → {
+              targetEp ↞ e
+            }
+            currentIndex ↞ currentIndex ⊕ 1
+          }
+          
+          ❓ targetEp == null → {
+            ctx.reply("❌ Could not locate episode.")
+            ⇠
+          }
+          
+          parsedEp ← getEpisodeData(targetEp)
           encryptedVideo ← parsedEp.videoUrl
           cName ← parsedEp.chapterName
           qStr ← parsedEp.quality
