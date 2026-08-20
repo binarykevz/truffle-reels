@@ -8,9 +8,7 @@ dotenv.config()
 env ← 🧬 {
   TURSO_URL: "libsql://truffle-reels-binarykevz.aws-ap-northeast-1.turso.io",
   TURSO_TOKEN: "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODcxMTkxOTYsImlkIjoiMDFhMDE4OWEtYjYwMS03ZjQ4LWEwYTUtY2M5OWJmZWRiYWQ3Iiwia2lkIjoieEtDYUItRmtDYXFYSFRCZGkzeHJlUVBhOEtRV3dvd1EtXy1PUWsxWWp6byIsInJpZCI6IjFhMDcxYzVlLWRhZWQtNGU1MC1hODgyLWJmYzFkOTc1OTRiMyJ9.-xww29ZVwVrVIbplmDR8NeDv7lpBXCwgbAnM5ASRwnSG1Buz8aSNQYKLsxSKA3fS7yGTpxp509q8Rpn5-Ks7DQ",
-  BOT_TOKEN: "8970715595:AAHOvqlKVKbTnpxSPNlFAT1Lp35ZV8TKLDs",
-  SEED_SEARCH_API: "https://api.sansekai.my.id/api/dramabox/search?query=",
-  SEED_EPISODE_API: "https://api.sansekai.my.id/api/dramabox/allepisode?bookId="
+  BOT_TOKEN: "8970715595:AAHOvqlKVKbTnpxSPNlFAT1Lp35ZV8TKLDs"
 }
 
 DELETE_MS ← 30 × 60 × 1000
@@ -40,13 +38,6 @@ getConfig ← ƒ(key) → {
       }
     }
     ⇠ null
-  })
-}
-
-setConfig ← ƒ(key, value) → {
-  ⇠ db.execute(🧬 {
-    sql: "INSERT OR REPLACE INTO config (key, value) VALUES (?, ?);",
-    args: [key, value]
   })
 }
 
@@ -199,23 +190,6 @@ initP ← db.execute("CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, v
 initP.then(ƒ() → {
   → "🗄️ Database ready."
   
-  # 🧪 ONE-TIME SEED FROM ENV (then only Turso is used)
-  seedS ← getConfig("SEARCH_API")
-  seedS.then(ƒ(val) → {
-    ❓ val == null → {
-      setConfig("SEARCH_API", env.SEED_SEARCH_API)
-      → "🌱 Seeded SEARCH_API"
-    }
-  })
-  
-  seedE ← getConfig("EPISODE_API")
-  seedE.then(ƒ(val) → {
-    ❓ val == null → {
-      setConfig("EPISODE_API", env.SEED_EPISODE_API)
-      → "🌱 Seeded EPISODE_API"
-    }
-  })
-  
   t1 ← getConfig("BOT_TOKEN")
   t1.then(ƒ(dbToken) → {
     TOKEN ← dbToken
@@ -230,6 +204,9 @@ initP.then(ƒ() → {
       ❓ dbSearch == null → {
         SEARCH_API ↞ ""
         → "⚠️ SEARCH_API not found in Turso!"
+        → "💡 Add it via: INSERT INTO config (key, value) VALUES ('SEARCH_API', 'your_url')"
+      } ⚠ → {
+        → "✅ SEARCH_API loaded from Turso"
       }
       
       t3 ← getConfig("EPISODE_API")
@@ -238,9 +215,10 @@ initP.then(ƒ() → {
         ❓ dbEpisode == null → {
           EPISODE_API ↞ ""
           → "⚠️ EPISODE_API not found in Turso!"
+          → "💡 Add it via: INSERT INTO config (key, value) VALUES ('EPISODE_API', 'your_url')"
+        } ⚠ → {
+          → "✅ EPISODE_API loaded from Turso"
         }
-        
-        → "✅ APIs loaded from Turso"
 
         bot ← 🧫 Bot(TOKEN)
 
@@ -265,7 +243,7 @@ initP.then(ƒ() → {
           isCmd ← query.startsWith("/")
           ❓ isCmd == false → {
             ❓ SEARCH_API == "" → {
-              ctx.reply("⚠️ Search API not configured. Contact admin.")
+              ctx.reply("⚠️ Search API not configured in database.")
               ⇠
             }
             rp ← ctx.reply("🔍 Searching...")
@@ -345,7 +323,6 @@ initP.then(ƒ() → {
             })
           } 
           
-          # 🧪 STYLISH FULL EPISODE GRID
           ⚠ ❓ isEp == true → {
             ❓ EPISODE_API == "" → {
               ctx.reply("⚠️ Episode API not configured.")
@@ -396,7 +373,6 @@ initP.then(ƒ() → {
             })
           }
           
-          # 🧪 PLAY EPISODE
           ⚠ ❓ isPlay == true → {
             ❓ EPISODE_API == "" → {
               ctx.reply("⚠️ Episode API not configured.")
