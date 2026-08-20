@@ -86,6 +86,76 @@ scheduleDeletion ← ƒ(botRef, chatId, messageId, delay) → {
   }, delay)
 }
 
+# 🧪 SEQUENTIAL BATCH PROCESSOR (Prevents Rate Limits & Hanging)
+processBatch ← ƒ(ctx, bot, episodes, index, end, bookId, offset) → {
+  ❓ index >= end → {
+    totalLen ← episodes.length
+    hasNext ← (offset ⊕ 20) < totalLen
+    ❓ hasNext == true → {
+      kb ← 🧫 InlineKeyboard()
+      nextOffset ← offset ⊕ 20
+      kb.text("➡️ Next 20 Episodes", "ep:" ⊕ bookId ⊕ ":" ⊕ nextOffset)
+      mr ← ctx.reply("📺 More episodes available:", 🧬 { reply_markup: kb })
+      mr.then(ƒ(m5) → {
+        scheduleDeletion(bot, m5.chat.id, m5.message_id, DELETE_MS)
+      })
+    } ⚠ → {
+      ctx.reply("✅ End of episodes.")
+    }
+    ⇠
+  }
+  
+  ep ← episodes[index]
+  parsedEp ← getEpisodeData(ep)
+  encryptedVideo ← parsedEp.videoUrl
+  cName ← parsedEp.chapterName
+  qStr ← parsedEp.quality
+  
+  ❓ encryptedVideo == "" → {
+    processBatch(ctx, bot, episodes, index ⊕ 1, end, bookId, offset)
+    ⇠
+  }
+  
+  → "🔐 Decrypting: " ⊕ cName
+  dp ← decryptVideo(encryptedVideo)
+  
+  dp.then(ƒ(decryptResult) → {
+    streamUrl ← decryptResult.streamUrl
+    
+    ❓ streamUrl == null → {
+      ctx.reply("⚠️ Failed to decrypt " ⊕ cName)
+      processBatch(ctx, bot, episodes, index ⊕ 1, end, bookId, offset)
+      ⇠
+    }
+    
+    cap ← "🎬 " ⊕ cName ⊕ " (" ⊕ qStr ⊕ "p) ⏳ Auto-deletes in 30m"
+    vr ← ctx.replyWithVideo(streamUrl, 🧬 { caption: cap })
+    
+    vr.then(ƒ(m4) → {
+      scheduleDeletion(bot, m4.chat.id, m4.message_id, DELETE_MS)
+      # Process next episode sequentially
+      processBatch(ctx, bot, episodes, index ⊕ 1, end, bookId, offset)
+    })
+    
+    # Fallback: If Telegram rejects the video (e.g. m3u8 format), send as text link
+    vr.catch(ƒ(err) → {
+      → "⚠️ Video send failed for " ⊕ cName ⊕ ": " ⊕ err.message
+      fallbackMsg ← "🎬 " ⊕ cName ⊕ " (" ⊕ qStr ⊕ "p)\n🔗 " ⊕ streamUrl
+      fr ← ctx.reply(fallbackMsg)
+      fr.then(ƒ(fm) → {
+        scheduleDeletion(bot, fm.chat.id, fm.message_id, DELETE_MS)
+        processBatch(ctx, bot, episodes, index ⊕ 1, end, bookId, offset)
+      })
+    })
+  })
+  
+  dp.catch(ƒ(err) → {
+    → "⚠️ Decrypt error for " ⊕ cName ⊕ ": " ⊕ err.message
+    ctx.reply("⚠️ Decrypt failed for " ⊕ cName)
+    processBatch(ctx, bot, episodes, index ⊕ 1, end, bookId, offset)
+  })
+}
+
 sendSearchResults ← ƒ(ctx, items, botRef) → {
   top ← items.slice(0, 5)
   ∑ item ∈ top → {
@@ -198,7 +268,7 @@ initP.then(ƒ() → {
       ⚠ ❓ isEp == true → {
         sliced ← data.slice(3)
         
-        # 🧪 SAFE STRING PARSING (Bypasses array indexing bugs)
+        # 🧪 SAFE STRING PARSING (Bypasses array coercion bugs)
         colonPos ← sliced.indexOf(":")
         ❓ colonPos == -1 → {
           bookId ← sliced
@@ -237,60 +307,13 @@ initP.then(ƒ() → {
             ⇠
           }
           
-          batch ← episodes.slice(offset, offset ⊕ 20)
-          totalLen ← episodes.length
-          hasNext ← (offset ⊕ 20) < totalLen
-          
-          ∑ ep ∈ batch → {
-            parsedEp ← getEpisodeData(ep)
-            encryptedVideo ← parsedEp.videoUrl
-            cName ← parsedEp.chapterName
-            qStr ← parsedEp.quality
-            
-            ❓ encryptedVideo == "" → {
-              ↻
-            }
-            
-            → "🔐 Decrypting: " ⊕ cName
-            
-            dp ← decryptVideo(encryptedVideo)
-            dp.then(ƒ(decryptResult) → {
-              streamUrl ← decryptResult.streamUrl
-              
-              ❓ streamUrl == null → {
-                → "⚠️ Decrypt failed for " ⊕ cName
-                ⇠
-              }
-              
-              cap ← "🎬 " ⊕ cName ⊕ " (" ⊕ qStr ⊕ "p) ⏳ Auto-deletes in 30m"
-              vr ← ctx.replyWithVideo(streamUrl, 🧬 { caption: cap })
-              
-              vrThen ← vr.then(ƒ(m4) → {
-                c4 ← m4.chat
-                scheduleDeletion(bot, c4.id, m4.message_id, DELETE_MS)
-              })
-              vrThen.catch(ƒ(err) → {
-                → "DEBUG SEND VIDEO ERROR: " ⊕ err.message
-              })
-            })
-            dp.catch(ƒ(err) → {
-              → "⚠️ Decrypt error for " ⊕ cName ⊕ ": " ⊕ err.message
-            })
+          end ← offset ⊕ 20
+          ❓ end > len → {
+            end ↞ len
           }
           
-          ❓ hasNext == true → {
-            kb ← 🧫 InlineKeyboard()
-            nextOffset ← offset ⊕ 20
-            kb.text("➡️ Next 20 Episodes", "ep:" ⊕ bookId ⊕ ":" ⊕ nextOffset)
-            mr ← ctx.reply("📺 More episodes available:", 🧬 { reply_markup: kb })
-            mrThen ← mr.then(ƒ(m5) → {
-              c5 ← m5.chat
-              scheduleDeletion(bot, c5.id, m5.message_id, DELETE_MS)
-            })
-            mrThen.catch(ƒ(err) → {
-              → err.message
-            })
-          }
+          # 🧪 START SEQUENTIAL PROCESSING
+          processBatch(ctx, bot, episodes, offset, end, bookId, offset)
         })
         
         p2.catch(ƒ(err) → {
