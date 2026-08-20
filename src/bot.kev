@@ -43,7 +43,6 @@ getEpisodeData ← ƒ(ep) → {
     ⇠ 🧬 { chapterName: cName, videoUrl: video }
   }
   
-  # Look for 720p in default CDN (isDefault == 1)
   ∑ cdn ∈ cdnList → {
     isDef ← Number(cdn.isDefault)
     ❓ isDef == 1 → {
@@ -61,7 +60,6 @@ getEpisodeData ← ƒ(ep) → {
     }
   }
   
-  # Fallback: search all CDNs for 720p
   ❓ video == "" → {
     ∑ cdn ∈ cdnList → {
       vpl ← cdn.videoPathList
@@ -84,9 +82,9 @@ getEpisodeData ← ƒ(ep) → {
   }
 }
 
-# 🧪 DECRYPT VIDEO URL
-decryptVideo ← ƒ(encryptedUrl) → {
-  decryptUrl ← "https://api.sansekai.my.id/api/dramabox/decrypt?url=" ⊕ encodeURIComponent(encryptedUrl)
+# 🧪 DECRYPT VIDEO URL (matching your example exactly)
+decryptVideo ← ƒ(videoPath) → {
+  decryptUrl ← "https://api.sansekai.my.id/api/dramabox/decrypt?url=" ⊕ encodeURIComponent(videoPath)
   fp ← fetch(decryptUrl)
   ⇠ fp.then(ƒ(res) → {
     ⇠ res.json()
@@ -268,15 +266,15 @@ initP.then(ƒ() → {
                   ↻
                 }
                 
-                → "DEBUG DECRYPTING: " ⊕ cName
+                → "🔐 Decrypting: " ⊕ cName
                 
-                # 🧪 DECRYPT THE VIDEO URL
+                # 🧪 DECRYPT AND SEND (matching your example)
                 dp ← decryptVideo(encryptedVideo)
                 dp.then(ƒ(decryptResult) → {
+                  # Extract streamUrl from the decrypt response
                   streamUrl ← decryptResult.streamUrl
-                  → "DEBUG STREAM URL: " ⊕ streamUrl
+                  → "✅ Stream URL: " ⊕ streamUrl
                   
-                  # 🧪 FIXED: Changed ↻ to ⇠ (return) because we are inside a .then() callback
                   ❓ streamUrl == null → {
                     → "⚠️ Decrypt failed for " ⊕ cName
                     ⇠
