@@ -33,31 +33,26 @@ getConfig ← ƒ(key) → {
   })
 }
 
+# 🧪 EXACT MATCH: eps[0].cdnList[0].videoPathList[0]
 getEpisodeData ← ƒ(ep) → {
   cName ← ep.chapterName
   video ← ""
   qStr ← ""
+  
   cdnList ← ep.cdnList
-  
-  ❓ cdnList == null → {
-    ⇠ 🧬 { chapterName: cName, videoUrl: video, quality: qStr }
-  }
-  
-  targetCdn ← cdnList[0]
-  ∑ cdn ∈ cdnList → {
-    isDef ← Number(cdn.isDefault)
-    ❓ isDef == 1 → {
-      targetCdn ↞ cdn
-    }
-  }
-  
-  vpl ← targetCdn.videoPathList
-  ❓ vpl != null → {
-    vLen ← vpl.length
-    ❓ vLen > 0 → {
-      firstVid ← vpl[0]
-      video ↞ firstVid.videoPath
-      qStr ↞ firstVid.quality
+  ❓ cdnList != null → {
+    cdnLen ← cdnList.length
+    ❓ cdnLen > 0 → {
+      cdn ← cdnList[0]
+      vpl ← cdn.videoPathList
+      ❓ vpl != null → {
+        vplLen ← vpl.length
+        ❓ vplLen > 0 → {
+          v ← vpl[0]
+          video ↞ v.videoPath
+          qStr ↞ v.quality
+        }
+      }
     }
   }
   
@@ -86,15 +81,15 @@ scheduleDeletion ← ƒ(botRef, chatId, messageId, delay) → {
   }, delay)
 }
 
-# 🧪 SEQUENTIAL BATCH PROCESSOR (Prevents Rate Limits & Hanging)
-processBatch ← ƒ(ctx, bot, episodes, index, end, bookId, offset) → {
+# 🧪 SEQUENTIAL BATCH PROCESSOR
+processBatch ← ƒ(ctx, bot, episodes, index, end, bId, off) → {
   ❓ index >= end → {
     totalLen ← episodes.length
-    hasNext ← (offset ⊕ 20) < totalLen
+    nextOff ← off ⊕ 20
+    hasNext ← nextOff < totalLen
     ❓ hasNext == true → {
       kb ← 🧫 InlineKeyboard()
-      nextOffset ← offset ⊕ 20
-      kb.text("➡️ Next 20 Episodes", "ep:" ⊕ bookId ⊕ ":" ⊕ nextOffset)
+      kb.text("➡️ Next 20 Episodes", "ep:" ⊕ bId ⊕ ":" ⊕ nextOff)
       mr ← ctx.reply("📺 More episodes available:", 🧬 { reply_markup: kb })
       mr.then(ƒ(m5) → {
         scheduleDeletion(bot, m5.chat.id, m5.message_id, DELETE_MS)
@@ -112,7 +107,7 @@ processBatch ← ƒ(ctx, bot, episodes, index, end, bookId, offset) → {
   qStr ← parsedEp.quality
   
   ❓ encryptedVideo == "" → {
-    processBatch(ctx, bot, episodes, index ⊕ 1, end, bookId, offset)
+    processBatch(ctx, bot, episodes, index ⊕ 1, end, bId, off)
     ⇠
   }
   
@@ -124,7 +119,7 @@ processBatch ← ƒ(ctx, bot, episodes, index, end, bookId, offset) → {
     
     ❓ streamUrl == null → {
       ctx.reply("⚠️ Failed to decrypt " ⊕ cName)
-      processBatch(ctx, bot, episodes, index ⊕ 1, end, bookId, offset)
+      processBatch(ctx, bot, episodes, index ⊕ 1, end, bId, off)
       ⇠
     }
     
@@ -133,18 +128,16 @@ processBatch ← ƒ(ctx, bot, episodes, index, end, bookId, offset) → {
     
     vr.then(ƒ(m4) → {
       scheduleDeletion(bot, m4.chat.id, m4.message_id, DELETE_MS)
-      # Process next episode sequentially
-      processBatch(ctx, bot, episodes, index ⊕ 1, end, bookId, offset)
+      processBatch(ctx, bot, episodes, index ⊕ 1, end, bId, off)
     })
     
-    # Fallback: If Telegram rejects the video (e.g. m3u8 format), send as text link
     vr.catch(ƒ(err) → {
       → "⚠️ Video send failed for " ⊕ cName ⊕ ": " ⊕ err.message
       fallbackMsg ← "🎬 " ⊕ cName ⊕ " (" ⊕ qStr ⊕ "p)\n🔗 " ⊕ streamUrl
       fr ← ctx.reply(fallbackMsg)
       fr.then(ƒ(fm) → {
         scheduleDeletion(bot, fm.chat.id, fm.message_id, DELETE_MS)
-        processBatch(ctx, bot, episodes, index ⊕ 1, end, bookId, offset)
+        processBatch(ctx, bot, episodes, index ⊕ 1, end, bId, off)
       })
     })
   })
@@ -152,7 +145,7 @@ processBatch ← ƒ(ctx, bot, episodes, index, end, bookId, offset) → {
   dp.catch(ƒ(err) → {
     → "⚠️ Decrypt error for " ⊕ cName ⊕ ": " ⊕ err.message
     ctx.reply("⚠️ Decrypt failed for " ⊕ cName)
-    processBatch(ctx, bot, episodes, index ⊕ 1, end, bookId, offset)
+    processBatch(ctx, bot, episodes, index ⊕ 1, end, bId, off)
   })
 }
 
@@ -267,16 +260,18 @@ initP.then(ƒ() → {
       
       ⚠ ❓ isEp == true → {
         sliced ← data.slice(3)
-        
-        # 🧪 SAFE STRING PARSING (Bypasses array coercion bugs)
         colonPos ← sliced.indexOf(":")
+        
+        # 🧪 FIXED SCOPING: Declare before the conditional blocks!
+        bookId ← ""
+        offset ← 0
+        
         ❓ colonPos == -1 → {
-          bookId ← sliced
-          offset ← 0
+          bookId ↞ sliced
         } ⚠ → {
-          bookId ← sliced.substring(0, colonPos)
+          bookId ↞ sliced.substring(0, colonPos)
           offsetStr ← sliced.substring(colonPos ⊕ 1)
-          offset ← Number(offsetStr)
+          offset ↞ Number(offsetStr)
         }
         
         epUrl ← EPISODE_API ⊕ bookId
@@ -312,7 +307,7 @@ initP.then(ƒ() → {
             end ↞ len
           }
           
-          # 🧪 START SEQUENTIAL PROCESSING
+          # Start sequential processing
           processBatch(ctx, bot, episodes, offset, end, bookId, offset)
         })
         
