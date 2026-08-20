@@ -1,35 +1,49 @@
-# 🧪 DramaBox Telegram Bot
+# 🎬 DramaBox Telegram Bot
 
-Modular Telegram bot for searching and streaming DramaBox videos.
-Written in **KevLang-Pure v2.1.0** (transpiles to TypeScript), runs on **Bun**, stores secrets in **Turso**, and **auto-deletes episodes after 30 minutes**.
+A Telegram bot for searching and streaming DramaBox short dramas, built entirely in **KevLang Pure 2.1.0** and running on **Bun**.
+
+---
 
 ## ✨ Features
 
-- 🔐 **Turso storage** — bot token + API endpoints live in an edge SQLite DB, not in code
-- ⏳ **Auto-delete** — every episode/search message self-deletes after 30 minutes
-- 📦 **Batched episodes** — 20 per batch with a ➡️ Next button
-- 🧪 **Modular KevLang-Pure** — one responsibility per `.kev` module
-- 🚀 **Bun-first** — install, run, and deploy with Bun
+- 🔍 **Drama Search** — Search dramas by title or genre with quick-filter buttons
+- 🎬 **Episode Streaming** — Fetch, decrypt, and stream episodes directly in Telegram
+- 🎯 **720p Quality** — Automatically selects 720p resolution to stay within Telegram's 50MB upload limit
+- 🔗 **Smart Fallback** — If video exceeds 50MB or upload fails, sends a playable link instead
+- 🗄️ **Turso Database** — All API keys and endpoints stored securely in Turso (zero hardcoded secrets)
+- ⏳ **Auto-Deletion** — All bot messages self-destruct after 30 minutes
+- 🎨 **Stylish UI** — Compact grid keyboard showing all episodes with clean formatting
+- ⚡ **Bun Runtime** — Fast startup and execution on Bun v1.3+
 
-## 🏗️ Architecture
+---
 
-```
-src/
-├── bot.kev          # Entry point — wires handlers to the Bot
-├── db.kev           # Turso client + config table CRUD
-├── seed.kev         # One-time seeder (env → Turso)
-├── config.kev       # Loads config from Turso (env fallback)
-├── api.kev          # DramaBox search + episode parsing (720p only)
-├── helpers.kev      # Captions + deletion scheduler
-└── handlers.kev     # /start, text search, callbacks, batching
-```
+## 🏗️ Tech Stack
+
+| Component | Technology |
+|-----------|-----------|
+| Language | KevLang Pure 2.1.0 |
+| Runtime | Bun |
+| Bot Framework | Grammy |
+| Database | Turso (libSQL) |
+| Video Source | DramaBox API |
+| Decryption | DramaBox Decrypt API |
+
+---
+
+## 📁 Project Structure
+
+├── src/
+│ └── bot.kev # Main bot (single consolidated file)
+├── .env # Environment variables (Turso + Bot token)
+├── package.json
+└── README.md
 
 ## 📋 Prerequisites
 
 - [Bun](https://bun.sh) ≥ 1.0
 - KevLang-Pure CLI v2.1.0:
   ```bash
-  bun add -g @itskevz/kevlang-pure@2.1.0
+  bun add -g kevlang-pure
   ```
 - A bot token from [@BotFather](https://t.me/BotFather)
 - A Turso database (see below)
@@ -102,6 +116,15 @@ kevlang-pure is the latest release line of KevLang — same symbol-first syntax,
 | `⚠`    | else / catch       | `⊕`    | concat / add     |
 | `∑ ∈`  | for-of             | `≡`    | strict equal     |
 | `🛡`   | try                | `↻`    | continue         |
+
+KevLang Gotchas (Learned During Development)
+No typeof operator — Use .length != null to check for arrays
+No Math.ceil() — Avoid JS globals; use arithmetic instead
+Use − not ⊖ for subtraction
+No array indexing (arr[0]) — Use ∑ loops to find elements
+Multi-line blocks only — Every { must be on its own line
+No semicolons — Statements are separated by newlines
+Top-level variables — Functions defined at top level can only access top-level variables (block-scoped variables inside .then() callbacks are not accessible outside)
 
 ## 🐳 Docker
 
