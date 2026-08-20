@@ -81,74 +81,6 @@ scheduleDeletion ← ƒ(botRef, chatId, messageId, delay) → {
   }, delay)
 }
 
-# 🧪 SEQUENTIAL BATCH PROCESSOR
-processBatch ← ƒ(ctx, bot, episodes, index, end, bId, off) → {
-  ❓ index >= end → {
-    totalLen ← episodes.length
-    nextOff ← off ⊕ 20
-    hasNext ← nextOff < totalLen
-    ❓ hasNext == true → {
-      kb ← 🧫 InlineKeyboard()
-      kb.text("➡️ Next 20 Episodes", "ep:" ⊕ bId ⊕ ":" ⊕ nextOff)
-      mr ← ctx.reply("📺 More episodes available:", 🧬 { reply_markup: kb })
-      mr.then(ƒ(m5) → {
-        scheduleDeletion(bot, m5.chat.id, m5.message_id, DELETE_MS)
-      })
-    } ⚠ → {
-      ctx.reply("✅ End of episodes.")
-    }
-    ⇠
-  }
-  
-  ep ← episodes[index]
-  parsedEp ← getEpisodeData(ep)
-  encryptedVideo ← parsedEp.videoUrl
-  cName ← parsedEp.chapterName
-  qStr ← parsedEp.quality
-  
-  ❓ encryptedVideo == "" → {
-    processBatch(ctx, bot, episodes, index ⊕ 1, end, bId, off)
-    ⇠
-  }
-  
-  → "🔐 Decrypting: " ⊕ cName
-  dp ← decryptVideo(encryptedVideo)
-  
-  dp.then(ƒ(decryptResult) → {
-    streamUrl ← decryptResult.streamUrl
-    
-    ❓ streamUrl == null → {
-      ctx.reply("⚠️ Failed to decrypt " ⊕ cName)
-      processBatch(ctx, bot, episodes, index ⊕ 1, end, bId, off)
-      ⇠
-    }
-    
-    cap ← "🎬 " ⊕ cName ⊕ " (" ⊕ qStr ⊕ "p) ⏳ Auto-deletes in 30m"
-    vr ← ctx.replyWithVideo(streamUrl, 🧬 { caption: cap })
-    
-    vr.then(ƒ(m4) → {
-      scheduleDeletion(bot, m4.chat.id, m4.message_id, DELETE_MS)
-      processBatch(ctx, bot, episodes, index ⊕ 1, end, bId, off)
-    })
-    
-    vr.catch(ƒ(err) → {
-      → "⚠️ Video send failed for " ⊕ cName ⊕ ": " ⊕ err.message
-      fallbackMsg ← "🎬 " ⊕ cName ⊕ " (" ⊕ qStr ⊕ "p)\n🔗 " ⊕ streamUrl
-      fr ← ctx.reply(fallbackMsg)
-      fr.then(ƒ(fm) → {
-        scheduleDeletion(bot, fm.chat.id, fm.message_id, DELETE_MS)
-        processBatch(ctx, bot, episodes, index ⊕ 1, end, bId, off)
-      })
-    })
-  })
-  
-  dp.catch(ƒ(err) → {
-    → "⚠️ Decrypt error for " ⊕ cName ⊕ ": " ⊕ err.message
-    ctx.reply("⚠️ Decrypt failed for " ⊕ cName)
-    processBatch(ctx, bot, episodes, index ⊕ 1, end, bId, off)
-  })
-}
-
 sendSearchResults ← ƒ(ctx, items, botRef) → {
   top ← items.slice(0, 5)
   ∑ item ∈ top → {
@@ -239,30 +171,25 @@ initP.then(ƒ() → {
       cq ← ctx.callbackQuery
       data ← cq.data
       ctx.answerCallbackQuery()
+      
       isSr ← data.startsWith("sr:")
       isEp ← data.startsWith("ep:")
+      isPlay ← data.startsWith("play:")
       
       ❓ isSr == true → {
         sliced ← data.slice(3)
         encoded ← encodeURIComponent(sliced)
         url ← SEARCH_API ⊕ encoded ⊕ "&lang=en"
         fp ← fetch(url)
-        p1 ← fp.then(ƒ(res) → {
-          ⇠ res.json()
-        })
-        p2 ← p1.then(ƒ(items) → {
-          sendSearchResults(ctx, items, bot)
-        })
-        p2.catch(ƒ(err) → {
-          → "DEBUG SEARCH CB ERROR: " ⊕ err.message
-        })
+        p1 ← fp.then(ƒ(res) → { ⇠ res.json() })
+        p2 ← p1.then(ƒ(items) → { sendSearchResults(ctx, items, bot) })
+        p2.catch(ƒ(err) → { → "DEBUG SEARCH CB ERROR: " ⊕ err.message })
       } 
       
+      # 🧪 SHOW EPISODE MENU (10 per page)
       ⚠ ❓ isEp == true → {
         sliced ← data.slice(3)
         colonPos ← sliced.indexOf(":")
-        
-        # 🧪 FIXED SCOPING: Declare before the conditional blocks!
         bookId ← ""
         offset ← 0
         
@@ -275,45 +202,131 @@ initP.then(ƒ() → {
         }
         
         epUrl ← EPISODE_API ⊕ bookId
-        → "DEBUG EP URL: " ⊕ epUrl
-        
-        rp ← ctx.reply("📡 Fetching episodes...")
+        rp ← ctx.reply("📡 Fetching episodes list...")
         rp.then(ƒ(m) → {
           chat ← m.chat
           scheduleDeletion(bot, chat.id, m.message_id, DELETE_MS)
         })
         
         fp ← fetch(epUrl)
-        p1 ← fp.then(ƒ(res) → {
-          ⇠ res.json()
-        })
+        p1 ← fp.then(ƒ(res) → { ⇠ res.json() })
         
         p2 ← p1.then(ƒ(episodes) → {
-          ❓ episodes == null → {
-            ctx.reply("❌ API returned no episodes.")
-            ⇠
-          }
-          
+          ❓ episodes == null → { ctx.reply("❌ API returned no episodes."); ⇠ }
           len ← episodes.length
-          → "DEBUG EPISODES COUNT: " ⊕ len
+          ❓ len == 0 → { ctx.reply("❌ No episodes found for this book."); ⇠ }
           
-          ❓ len == 0 → {
-            ctx.reply("❌ No episodes found for this book.")
-            ⇠
+          end ← offset ⊕ 10
+          ❓ end > len → { end ↞ len }
+          
+          batch ← episodes.slice(offset, end)
+          kb ← 🧫 InlineKeyboard()
+          counter ← offset
+          
+          ∑ ep ∈ batch → {
+            kb.text(ep.chapterName, "play:" ⊕ bookId ⊕ ":" ⊕ counter)
+            kb.row()
+            counter ↞ counter ⊕ 1
           }
           
-          end ← offset ⊕ 20
-          ❓ end > len → {
-            end ↞ len
+          nextOff ← offset ⊕ 10
+          hasNext ← nextOff < len
+          ❓ hasNext == true → {
+            kb.text("➡️ Next 10 Episodes", "ep:" ⊕ bookId ⊕ ":" ⊕ nextOff)
           }
           
-          # Start sequential processing
-          processBatch(ctx, bot, episodes, offset, end, bookId, offset)
+          mr ← ctx.reply("🎬 Select an episode to watch:", 🧬 { reply_markup: kb })
+          mr.then(ƒ(m5) → {
+            chat ← m5.chat
+            scheduleDeletion(bot, chat.id, m5.message_id, DELETE_MS)
+          })
         })
         
         p2.catch(ƒ(err) → {
-          → "DEBUG EPISODE CHAIN ERROR: " ⊕ err.message
-          ctx.reply("⚠️ Error fetching episodes: " ⊕ err.message)
+          → "DEBUG EPISODE LIST ERROR: " ⊕ err.message
+          ctx.reply("⚠️ Error fetching list: " ⊕ err.message)
+        })
+      }
+      
+      # 🧪 PLAY SPECIFIC EPISODE
+      ⚠ ❓ isPlay == true → {
+        sliced ← data.slice(5)
+        colonPos ← sliced.indexOf(":")
+        bookId ← ""
+        epIndex ← 0
+        
+        ❓ colonPos == -1 → {
+          bookId ↞ sliced
+        } ⚠ → {
+          bookId ↞ sliced.substring(0, colonPos)
+          indexStr ← sliced.substring(colonPos ⊕ 1)
+          epIndex ↞ Number(indexStr)
+        }
+        
+        epUrl ← EPISODE_API ⊕ bookId
+        rp ← ctx.reply("🔐 Fetching and decrypting video...")
+        rp.then(ƒ(m) → {
+          chat ← m.chat
+          scheduleDeletion(bot, chat.id, m.message_id, DELETE_MS)
+        })
+        
+        fp ← fetch(epUrl)
+        p1 ← fp.then(ƒ(res) → { ⇠ res.json() })
+        
+        p2 ← p1.then(ƒ(episodes) → {
+          ❓ episodes == null → { ctx.reply("❌ API returned no episodes."); ⇠ }
+          len ← episodes.length
+          ❓ epIndex >= len → { ctx.reply("❌ Episode not found."); ⇠ }
+          
+          ep ← episodes[epIndex]
+          parsedEp ← getEpisodeData(ep)
+          encryptedVideo ← parsedEp.videoUrl
+          cName ← parsedEp.chapterName
+          qStr ← parsedEp.quality
+          
+          ❓ encryptedVideo == "" → {
+            ctx.reply("⚠️ No video URL found for " ⊕ cName)
+            ⇠
+          }
+          
+          dp ← decryptVideo(encryptedVideo)
+          dp.then(ƒ(decryptResult) → {
+            streamUrl ← decryptResult.streamUrl
+            
+            ❓ streamUrl == null → {
+              ctx.reply("⚠️ Failed to decrypt " ⊕ cName)
+              ⇠
+            }
+            
+            cap ← "🎬 " ⊕ cName ⊕ " (" ⊕ qStr ⊕ "p) ⏳ Auto-deletes in 30m"
+            vr ← ctx.replyWithVideo(streamUrl, 🧬 { caption: cap })
+            
+            vr.then(ƒ(m4) → {
+              chat ← m4.chat
+              scheduleDeletion(bot, chat.id, m4.message_id, DELETE_MS)
+            })
+            
+            # Fallback to link if Telegram rejects the video format
+            vr.catch(ƒ(err) → {
+              → "⚠️ Video send failed for " ⊕ cName ⊕ ": " ⊕ err.message
+              fallbackMsg ← "🎬 " ⊕ cName ⊕ " (" ⊕ qStr ⊕ "p)\n🔗 " ⊕ streamUrl
+              fr ← ctx.reply(fallbackMsg)
+              fr.then(ƒ(fm) → {
+                chat ← fm.chat
+                scheduleDeletion(bot, chat.id, fm.message_id, DELETE_MS)
+              })
+            })
+          })
+          
+          dp.catch(ƒ(err) → {
+            → "⚠️ Decrypt error for " ⊕ cName ⊕ ": " ⊕ err.message
+            ctx.reply("⚠️ Decrypt failed for " ⊕ cName)
+          })
+        })
+        
+        p2.catch(ƒ(err) → {
+          → "DEBUG PLAY ERROR: " ⊕ err.message
+          ctx.reply("⚠️ Error playing episode: " ⊕ err.message)
         })
       }
     })
