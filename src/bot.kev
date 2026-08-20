@@ -33,41 +33,49 @@ getConfig ← ƒ(key) → {
   })
 }
 
-# 🧪 IMPROVED PARSER WITH FALLBACK
+# 🧪 CORRECTED PARSER: Targets isDefault == 1 CDN
 getEpisodeData ← ƒ(ep) → {
   cName ← ep.chapterName
   video ← ""
-  fallbackVideo ← ""
   cdnList ← ep.cdnList
   
   ❓ cdnList == null → {
     ⇠ 🧬 { chapterName: cName, videoUrl: video }
   }
   
+  # Step 1: Look for 720p specifically in the default CDN (isDefault == 1)
   ∑ cdn ∈ cdnList → {
-    vpl ← cdn.videoPathList
-    ❓ vpl == null → {
-      ↻
-    }
-    ∑ v ∈ vpl → {
-      # Save the first available video as a fallback
-      ❓ fallbackVideo == "" → {
-        fallbackVideo ↞ v.videoPath
-      }
-      
-      # Convert quality to number to handle both "720" and 720
-      q ← Number(v.quality)
-      ❓ q == 720 → {
-        ❓ video == "" → {
-          video ↞ v.videoPath
+    isDef ← Number(cdn.isDefault)
+    ❓ isDef == 1 → {
+      vpl ← cdn.videoPathList
+      ❓ vpl != null → {
+        ∑ v ∈ vpl → {
+          q ← Number(v.quality)
+          ❓ q == 720 → {
+            ❓ video == "" → {
+              video ↞ v.videoPath
+            }
+          }
         }
       }
     }
   }
   
-  # If no 720p video was found, use the first available video
+  # Step 2: Fallback - if not found in default CDN, search all CDNs for 720p
   ❓ video == "" → {
-    video ↞ fallbackVideo
+    ∑ cdn ∈ cdnList → {
+      vpl ← cdn.videoPathList
+      ❓ vpl != null → {
+        ∑ v ∈ vpl → {
+          q ← Number(v.quality)
+          ❓ q == 720 → {
+            ❓ video == "" → {
+              video ↞ v.videoPath
+            }
+          }
+        }
+      }
+    }
   }
   
   ⇠ 🧬 {
