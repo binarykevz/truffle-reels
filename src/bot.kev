@@ -128,7 +128,6 @@ extractEpisodes ← ƒ(response) → {
   ⇠ null
 }
 
-# 🧪 FETCH ALL EPISODES BY PAGINATING THROUGH API PAGES
 fetchAllEpisodes ← ƒ(bookId, page, collected) → {
   ❓ page > 20 → {
     ⇠ collected
@@ -348,16 +347,14 @@ initP.then(ƒ() → {
           }
           
           ❓ offset > 0 → {
-            prevOff ← offset ⊖ 10
+            prevOff ← offset − 10
             ❓ prevOff < 0 → {
               prevOff ↞ 0
             }
             kb.text("⬅️ Previous 10", "ep:" ⊕ bookId ⊕ ":" ⊕ prevOff)
           }
           
-          pageInfo ← (offset ÷ 10) ⊕ 1
-          totalPages ← Math.ceil(len ÷ 10)
-          mr ← ctx.reply("🎬 Page " ⊕ pageInfo ⊕ "/" ⊕ totalPages ⊕ " (" ⊕ len ⊕ " episodes):", 🧬 { reply_markup: kb })
+          mr ← ctx.reply("🎬 Select an episode (" ⊕ len ⊕ " total):", 🧬 { reply_markup: kb })
           mr.then(ƒ(m5) → {
             chat ← m5.chat
             scheduleDeletion(bot, chat.id, m5.message_id, DELETE_MS)
