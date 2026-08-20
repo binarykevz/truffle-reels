@@ -134,7 +134,6 @@ getEpisodeData ← ƒ(ep) → {
   }
 }
 
-# 🧪 SINGLE FETCH: Get ALL episodes for one specific bookId
 fetchEpisodesForBook ← ƒ(bookId) → {
   epUrl ← EPISODE_API ⊕ bookId
   → "DEBUG FETCHING: " ⊕ epUrl
@@ -180,7 +179,7 @@ sendSearchResults ← ƒ(ctx, items, botRef) → {
     caption ← "🎬 " ⊕ bn ⊕ "\n\n📖 " ⊕ intro ⊕ "\n\n🧑‍🤝‍🧑 " ⊕ prot ⊕ "\n🏷 " ⊕ tagStr
     kb ← 🧫 InlineKeyboard()
     bid ← item.bookId
-    kb.text("🎞 Get Episodes", "ep:" ⊕ bid ⊕ ":0")
+    kb.text("🎞 Get Episodes", "ep:" ⊕ bid)
     cov ← item.cover
     pr ← ctx.replyWithPhoto(cov, 🧬 { caption: caption, reply_markup: kb })
     pr.then(ƒ(m) → {
@@ -296,21 +295,11 @@ initP.then(ƒ() → {
         })
       } 
       
+      # 🧪 SHOW ALL EPISODES AT ONCE
       ⚠ ❓ isEp == true → {
-        sliced ← data.slice(3)
-        colonPos ← sliced.indexOf(":")
-        bookId ← ""
-        offset ← 0
+        bookId ← data.slice(3)
         
-        ❓ colonPos == -1 → {
-          bookId ↞ sliced
-        } ⚠ → {
-          bookId ↞ sliced.substring(0, colonPos)
-          offsetStr ← sliced.substring(colonPos ⊕ 1)
-          offset ↞ Number(offsetStr)
-        }
-        
-        rp ← ctx.reply("📡 Fetching episodes for this book...")
+        rp ← ctx.reply("📡 Fetching all episodes...")
         rp.then(ƒ(m) → {
           chat ← m.chat
           scheduleDeletion(bot, chat.id, m.message_id, DELETE_MS)
@@ -326,36 +315,16 @@ initP.then(ƒ() → {
           
           → "DEBUG TOTAL EPISODES: " ⊕ len
           
-          end ← offset ⊕ 10
-          ❓ end > len → {
-            end ↞ len
-          }
-          
-          batch ← epList.slice(offset, end)
           kb ← 🧫 InlineKeyboard()
-          counter ← offset
+          counter ← 0
           
-          ∑ ep ∈ batch → {
+          ∑ ep ∈ epList → {
             kb.text(ep.chapterName, "play:" ⊕ bookId ⊕ ":" ⊕ counter)
             kb.row()
             counter ↞ counter ⊕ 1
           }
           
-          nextOff ← offset ⊕ 10
-          hasNext ← nextOff < len
-          ❓ hasNext == true → {
-            kb.text("➡️ Next 10", "ep:" ⊕ bookId ⊕ ":" ⊕ nextOff)
-          }
-          
-          ❓ offset > 0 → {
-            prevOff ← offset − 10
-            ❓ prevOff < 0 → {
-              prevOff ↞ 0
-            }
-            kb.text("⬅️ Previous 10", "ep:" ⊕ bookId ⊕ ":" ⊕ prevOff)
-          }
-          
-          mr ← ctx.reply("🎬 Episodes (" ⊕ len ⊕ " total):", 🧬 { reply_markup: kb })
+          mr ← ctx.reply("🎬 All Episodes (" ⊕ len ⊕ "):", 🧬 { reply_markup: kb })
           mr.then(ƒ(m5) → {
             chat ← m5.chat
             scheduleDeletion(bot, chat.id, m5.message_id, DELETE_MS)
