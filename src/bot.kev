@@ -85,18 +85,15 @@ getEpisodeData ← ƒ(ep) → {
   }
 }
 
-# 🧪 EXTRACT EPISODES ARRAY FROM ANY RESPONSE FORMAT
 extractEpisodes ← ƒ(response) → {
   ❓ response == null → {
     ⇠ null
   }
   
-  # If response is already an array (has .length and .slice)
   ❓ response.length != null → {
     ⇠ response
   }
   
-  # Try common wrapper properties
   ❓ response.data != null → {
     ❓ response.data.length != null → {
       ⇠ response.data
@@ -129,6 +126,39 @@ extractEpisodes ← ƒ(response) → {
   }
   
   ⇠ null
+}
+
+# 🧪 FETCH ALL EPISODES BY PAGINATING THROUGH API PAGES
+fetchAllEpisodes ← ƒ(bookId, page, collected) → {
+  ❓ page > 20 → {
+    ⇠ collected
+  }
+  
+  pageUrl ← EPISODE_API ⊕ bookId ⊕ "&page=" ⊕ page
+  fp ← fetch(pageUrl)
+  p1 ← fp.then(ƒ(res) → {
+    ⇠ res.json()
+  })
+  ⇠ p1.then(ƒ(response) → {
+    epList ← extractEpisodes(response)
+    
+    ❓ epList == null → {
+      ⇠ collected
+    }
+    ❓ epList.length == 0 → {
+      ⇠ collected
+    }
+    
+    ∑ ep ∈ epList → {
+      collected.push(ep)
+    }
+    
+    ❓ epList.length < 40 → {
+      ⇠ collected
+    }
+    
+    ⇠ fetchAllEpisodes(bookId, page ⊕ 1, collected)
+  })
 }
 
 decryptVideo ← ƒ(videoPath) → {
@@ -274,24 +304,17 @@ initP.then(ƒ() → {
           offset ↞ Number(offsetStr)
         }
         
-        epUrl ← EPISODE_API ⊕ bookId
-        rp ← ctx.reply("📡 Fetching episodes list...")
+        rp ← ctx.reply("📡 Fetching all episodes...")
         rp.then(ƒ(m) → {
           chat ← m.chat
           scheduleDeletion(bot, chat.id, m.message_id, DELETE_MS)
         })
         
-        fp ← fetch(epUrl)
-        p1 ← fp.then(ƒ(res) → {
-          ⇠ res.json()
-        })
-        
-        p2 ← p1.then(ƒ(response) → {
-          # 🧪 EXTRACT EPISODES FROM ANY RESPONSE FORMAT
-          epList ← extractEpisodes(response)
-          
+        allEps ← []
+        fetchPromise ← fetchAllEpisodes(bookId, 1, allEps)
+        fetchPromise.then(ƒ(epList) → {
           ❓ epList == null → {
-            ctx.reply("❌ Could not extract episodes from API response.")
+            ctx.reply("❌ Could not fetch episodes.")
             ⇠
           }
           
@@ -301,8 +324,7 @@ initP.then(ƒ() → {
             ⇠
           }
           
-          → "DEBUG TOTAL EPISODES: " ⊕ len
-          → "DEBUG OFFSET: " ⊕ offset
+          → "DEBUG TOTAL EPISODES FETCHED: " ⊕ len
           
           end ← offset ⊕ 10
           ❓ end > len → {
@@ -325,16 +347,25 @@ initP.then(ƒ() → {
             kb.text("➡️ Next 10 Episodes", "ep:" ⊕ bookId ⊕ ":" ⊕ nextOff)
           }
           
-          mr ← ctx.reply("🎬 Select an episode to watch (" ⊕ len ⊕ " total):", 🧬 { reply_markup: kb })
+          ❓ offset > 0 → {
+            prevOff ← offset ⊖ 10
+            ❓ prevOff < 0 → {
+              prevOff ↞ 0
+            }
+            kb.text("⬅️ Previous 10", "ep:" ⊕ bookId ⊕ ":" ⊕ prevOff)
+          }
+          
+          pageInfo ← (offset ÷ 10) ⊕ 1
+          totalPages ← Math.ceil(len ÷ 10)
+          mr ← ctx.reply("🎬 Page " ⊕ pageInfo ⊕ "/" ⊕ totalPages ⊕ " (" ⊕ len ⊕ " episodes):", 🧬 { reply_markup: kb })
           mr.then(ƒ(m5) → {
             chat ← m5.chat
             scheduleDeletion(bot, chat.id, m5.message_id, DELETE_MS)
           })
         })
-        
-        p2.catch(ƒ(err) → {
-          → "DEBUG EPISODE LIST ERROR: " ⊕ err.message
-          ctx.reply("⚠️ Error fetching list: " ⊕ err.message)
+        fetchPromise.catch(ƒ(err) → {
+          → "DEBUG FETCH ALL ERROR: " ⊕ err.message
+          ctx.reply("⚠️ Error fetching episodes: " ⊕ err.message)
         })
       }
       
@@ -352,24 +383,17 @@ initP.then(ƒ() → {
           epIndex ↞ Number(indexStr)
         }
         
-        epUrl ← EPISODE_API ⊕ bookId
         rp ← ctx.reply("🔐 Fetching and decrypting video...")
         rp.then(ƒ(m) → {
           chat ← m.chat
           scheduleDeletion(bot, chat.id, m.message_id, DELETE_MS)
         })
         
-        fp ← fetch(epUrl)
-        p1 ← fp.then(ƒ(res) → {
-          ⇠ res.json()
-        })
-        
-        p2 ← p1.then(ƒ(response) → {
-          # 🧪 EXTRACT EPISODES FROM ANY RESPONSE FORMAT
-          epList ← extractEpisodes(response)
-          
+        allEps ← []
+        fetchPromise ← fetchAllEpisodes(bookId, 1, allEps)
+        fetchPromise.then(ƒ(epList) → {
           ❓ epList == null → {
-            ctx.reply("❌ Could not extract episodes from API response.")
+            ctx.reply("❌ Could not fetch episodes.")
             ⇠
           }
           
@@ -448,10 +472,9 @@ initP.then(ƒ() → {
             ctx.reply("⚠️ Decrypt failed for " ⊕ cName)
           })
         })
-        
-        p2.catch(ƒ(err) → {
-          → "DEBUG PLAY ERROR: " ⊕ err.message
-          ctx.reply("⚠️ Error playing episode: " ⊕ err.message)
+        fetchPromise.catch(ƒ(err) → {
+          → "DEBUG PLAY FETCH ERROR: " ⊕ err.message
+          ctx.reply("⚠️ Error fetching episode: " ⊕ err.message)
         })
       }
     })
