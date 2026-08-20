@@ -44,7 +44,6 @@ getEpisodeData ← ƒ(ep) → {
     ⇠ 🧬 { chapterName: cName, videoUrl: video, quality: qStr }
   }
   
-  # Find the default CDN, fallback to the first one
   targetCdn ← cdnList[0]
   ∑ cdn ∈ cdnList → {
     isDef ← Number(cdn.isDefault)
@@ -53,7 +52,6 @@ getEpisodeData ← ƒ(ep) → {
     }
   }
   
-  # Grab the very first video path from that CDN
   vpl ← targetCdn.videoPathList
   ❓ vpl != null → {
     vLen ← vpl.length
@@ -128,7 +126,7 @@ initP.then(ƒ() → {
         SEARCH_API ↞ "https://api.sansekai.my.id/api/dramabox/search?query="
       }
       t3 ← getConfig("EPISODE_API")
-    t3.then(ƒ(dbEp) → {
+      t3.then(ƒ(dbEp) → {
         EPISODE_API ← dbEp
         ❓ dbEp == null → {
           EPISODE_API ↞ "https://api.sansekai.my.id/api/dramabox/allepisode?bookId="
@@ -216,7 +214,9 @@ initP.then(ƒ() → {
             offsetStr ← parts[1]
             offset ← Number(offsetStr)
             
+            # 🧪 FIXED: Removed &lang=en to match your get_episodes code
             epUrl ← EPISODE_API ⊕ bookId
+            
             rp ← ctx.reply("📡 Fetching episodes...")
             rp.then(ƒ(m) → {
               chat ← m.chat
