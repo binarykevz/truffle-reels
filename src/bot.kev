@@ -117,7 +117,6 @@ initP.then(ƒ() → {
       TOKEN ↞ env.BOT_TOKEN
     }
     
-    # 🧪 HARDCODED APIs: Bypasses stale Turso cache completely
     SEARCH_API ← "https://api.sansekai.my.id/api/dramabox/search?query="
     EPISODE_API ← "https://api.sansekai.my.id/api/dramabox/allepisode?bookId="
 
@@ -198,12 +197,18 @@ initP.then(ƒ() → {
       
       ⚠ ❓ isEp == true → {
         sliced ← data.slice(3)
-        parts ← sliced.split(":")
-        bookId ← parts[0]
-        offsetStr ← parts[1]
-        offset ← Number(offsetStr)
         
-        # ✅ EXACT MATCH: No &lang=en, just bookId
+        # 🧪 SAFE STRING PARSING (Bypasses array indexing bugs)
+        colonPos ← sliced.indexOf(":")
+        ❓ colonPos == -1 → {
+          bookId ← sliced
+          offset ← 0
+        } ⚠ → {
+          bookId ← sliced.substring(0, colonPos)
+          offsetStr ← sliced.substring(colonPos ⊕ 1)
+          offset ← Number(offsetStr)
+        }
+        
         epUrl ← EPISODE_API ⊕ bookId
         → "DEBUG EP URL: " ⊕ epUrl
         
