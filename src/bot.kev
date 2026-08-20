@@ -85,6 +85,52 @@ getEpisodeData ← ƒ(ep) → {
   }
 }
 
+# 🧪 EXTRACT EPISODES ARRAY FROM ANY RESPONSE FORMAT
+extractEpisodes ← ƒ(response) → {
+  ❓ response == null → {
+    ⇠ null
+  }
+  
+  # If response is already an array (has .length and .slice)
+  ❓ response.length != null → {
+    ⇠ response
+  }
+  
+  # Try common wrapper properties
+  ❓ response.data != null → {
+    ❓ response.data.length != null → {
+      ⇠ response.data
+    }
+    ❓ response.data.list != null → {
+      ⇠ response.data.list
+    }
+    ❓ response.data.episodes != null → {
+      ⇠ response.data.episodes
+    }
+    ❓ response.data.result != null → {
+      ⇠ response.data.result
+    }
+  }
+  
+  ❓ response.result != null → {
+    ⇠ response.result
+  }
+  
+  ❓ response.episodes != null → {
+    ⇠ response.episodes
+  }
+  
+  ❓ response.list != null → {
+    ⇠ response.list
+  }
+  
+  ❓ response.items != null → {
+    ⇠ response.items
+  }
+  
+  ⇠ null
+}
+
 decryptVideo ← ƒ(videoPath) → {
   decryptUrl ← "https://api.sansekai.my.id/api/dramabox/decrypt?url=" ⊕ encodeURIComponent(videoPath)
   fp ← fetch(decryptUrl)
@@ -240,23 +286,30 @@ initP.then(ƒ() → {
           ⇠ res.json()
         })
         
-        p2 ← p1.then(ƒ(episodes) → {
-          ❓ episodes == null → {
-            ctx.reply("❌ API returned no episodes.")
+        p2 ← p1.then(ƒ(response) → {
+          # 🧪 EXTRACT EPISODES FROM ANY RESPONSE FORMAT
+          epList ← extractEpisodes(response)
+          
+          ❓ epList == null → {
+            ctx.reply("❌ Could not extract episodes from API response.")
             ⇠
           }
-          len ← episodes.length
+          
+          len ← epList.length
           ❓ len == 0 → {
             ctx.reply("❌ No episodes found for this book.")
             ⇠
           }
+          
+          → "DEBUG TOTAL EPISODES: " ⊕ len
+          → "DEBUG OFFSET: " ⊕ offset
           
           end ← offset ⊕ 10
           ❓ end > len → {
             end ↞ len
           }
           
-          batch ← episodes.slice(offset, end)
+          batch ← epList.slice(offset, end)
           kb ← 🧫 InlineKeyboard()
           counter ← offset
           
@@ -272,7 +325,7 @@ initP.then(ƒ() → {
             kb.text("➡️ Next 10 Episodes", "ep:" ⊕ bookId ⊕ ":" ⊕ nextOff)
           }
           
-          mr ← ctx.reply("🎬 Select an episode to watch:", 🧬 { reply_markup: kb })
+          mr ← ctx.reply("🎬 Select an episode to watch (" ⊕ len ⊕ " total):", 🧬 { reply_markup: kb })
           mr.then(ƒ(m5) → {
             chat ← m5.chat
             scheduleDeletion(bot, chat.id, m5.message_id, DELETE_MS)
@@ -311,12 +364,16 @@ initP.then(ƒ() → {
           ⇠ res.json()
         })
         
-        p2 ← p1.then(ƒ(episodes) → {
-          ❓ episodes == null → {
-            ctx.reply("❌ API returned no episodes.")
+        p2 ← p1.then(ƒ(response) → {
+          # 🧪 EXTRACT EPISODES FROM ANY RESPONSE FORMAT
+          epList ← extractEpisodes(response)
+          
+          ❓ epList == null → {
+            ctx.reply("❌ Could not extract episodes from API response.")
             ⇠
           }
-          len ← episodes.length
+          
+          len ← epList.length
           ❓ epIndex >= len → {
             ctx.reply("❌ Episode not found.")
             ⇠
@@ -324,7 +381,7 @@ initP.then(ƒ() → {
           
           targetEp ← null
           currentIndex ← 0
-          ∑ e ∈ episodes → {
+          ∑ e ∈ epList → {
             ❓ currentIndex == epIndex → {
               targetEp ↞ e
             }
@@ -357,7 +414,6 @@ initP.then(ƒ() → {
             
             cap ← "🎬 " ⊕ cName ⊕ " (" ⊕ qStr ⊕ "p) ⏳ Auto-deletes in 30m"
             
-            # 🧪 CONVERT TO PLAYABLE VIDEO BY STREAMING THROUGH BOT
             vfp ← fetch(streamUrl)
             vfp.then(ƒ(vres) → {
               videoStream ← vres.body
@@ -372,7 +428,7 @@ initP.then(ƒ() → {
               
               vr.catch(ƒ(err) → {
                 → "⚠️ Video send failed for " ⊕ cName ⊕ ": " ⊕ err.message
-                fallbackMsg ← "⚠️ Video too large or format unsupported. Link:\n🔗 " ⊕ streamUrl
+                fallbackMsg ← "⚠️ Video upload failed. Link:\n🔗 " ⊕ streamUrl
                 fr ← ctx.reply(fallbackMsg)
                 fr.then(ƒ(fm) → {
                   chat ← fm.chat
