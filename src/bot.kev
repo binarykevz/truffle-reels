@@ -6,7 +6,7 @@
 dotenv.config()
 
 env ← 🧬 {
-  TURSO_URL: "libsql://your turso url",
+  TURSO_URL: "libsql://truffle-reels-binarykevz.aws-ap-northeast-1.turso.io",
   TURSO_TOKEN:"your turso token",
   BOT_TOKEN: "your bot token from @botfather"
 }
